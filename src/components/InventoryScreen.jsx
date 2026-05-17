@@ -376,7 +376,7 @@ export default function InventoryScreen({ t }) {
   const onSaveEdit = async (event) => {
     event.preventDefault();
     if (!editing) return;
-    if (!String(editing.name || "").trim()) {
+    if (editing.id && !String(editing.name || "").trim()) {
       setError(t.fillAll);
       return;
     }
@@ -404,14 +404,21 @@ export default function InventoryScreen({ t }) {
 
       const payload = {
         ...editing,
-        name: String(editing.name || "").trim(),
+        name: editing.id
+          ? String(editing.name || "").trim()
+          : String(nextDetails.productCode || normalizedBarcode || normalizedLabelNumber || "").trim(),
         barcode: normalizedBarcode,
         labelNumber: normalizedLabelNumber,
-        category: String(editing.category || "Genel").trim() || "Genel",
-        quantity: Math.max(0, Number(editing.quantity || 0)),
-        price: Math.max(0, Number(editing.price || 0)),
+        category: editing.id ? String(editing.category || "Genel").trim() || "Genel" : "Genel",
+        quantity: editing.id ? Math.max(0, Number(editing.quantity || 0)) : 1,
+        price: editing.id ? Math.max(0, Number(editing.price || 0)) : 0,
         details: sanitizeDetails(nextDetails)
       };
+
+      if (!payload.name) {
+        setError(t.codeOrLabelRequired);
+        return;
+      }
 
       if (editing.id) {
         await updateProduct(editing.id, payload);
@@ -501,7 +508,9 @@ export default function InventoryScreen({ t }) {
 
       <div className="max-h-[70vh] space-y-3 overflow-auto pr-1">
         {filtered.length === 0 ? (
-          <div className="glass rounded-2xl px-4 py-4 text-sm text-slate-300">{products.length === 0 ? t.emptyState : t.loading}</div>
+          <div className="glass rounded-2xl px-4 py-4 text-sm text-slate-300">
+            {products.length === 0 ? t.emptyState : search.trim() ? t.productNotFound : t.emptyState}
+          </div>
         ) : null}
 
         {filtered.map((p) => {
@@ -621,53 +630,57 @@ export default function InventoryScreen({ t }) {
       {editing ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4">
           <form onSubmit={onSaveEdit} className="glass w-full max-w-lg rounded-3xl p-4 space-y-3">
-            <h3 className="font-display text-xl font-bold">{isCreating ? t.manualAddProduct : t.editProduct}</h3>
+            {!isCreating ? <h3 className="font-display text-xl font-bold">{t.editProduct}</h3> : null}
 
-            <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <label className="space-y-1 col-span-2">
-                  <span className="text-[11px] text-slate-400">{t.productName}</span>
-                  <input
-                    value={editing.name ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder={t.productName}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.category}</span>
-                  <input
-                    value={editing.category ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, category: e.target.value }))}
-                    placeholder={t.category}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.quantityLabel}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editing.quantity ?? 0}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, quantity: e.target.value }))}
-                    placeholder={t.quantityLabel}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.price}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={editing.price ?? 0}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, price: e.target.value }))}
-                    placeholder={t.price}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
+            {isCreating ? <p className="text-sm text-amber-300">{t.manualAddHint}</p> : null}
+
+            {!isCreating ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1 col-span-2">
+                    <span className="text-[11px] text-slate-400">{t.productName}</span>
+                    <input
+                      value={editing.name ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder={t.productName}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.category}</span>
+                    <input
+                      value={editing.category ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, category: e.target.value }))}
+                      placeholder={t.category}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.quantityLabel}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editing.quantity ?? 0}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, quantity: e.target.value }))}
+                      placeholder={t.quantityLabel}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.price}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editing.price ?? 0}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, price: e.target.value }))}
+                      placeholder={t.price}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
               <p className="text-xs font-semibold text-slate-300">{t.optionalIdentifiersTitle}</p>
@@ -854,14 +867,24 @@ export default function InventoryScreen({ t }) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => closeEditModal()} className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-bold">
-                {t.cancel}
+            {isCreating ? (
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full rounded-2xl bg-amber-300 px-4 py-4 text-lg font-extrabold text-slate-900 disabled:opacity-60"
+              >
+                {busy ? t.loading : t.saveProduct}
               </button>
-              <button type="submit" disabled={busy} className="rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-extrabold text-slate-900 disabled:opacity-60">
-                {busy ? t.loading : isCreating ? t.saveProduct : t.saveChanges}
-              </button>
-            </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => closeEditModal()} className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-bold">
+                  {t.cancel}
+                </button>
+                <button type="submit" disabled={busy} className="rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-extrabold text-slate-900 disabled:opacity-60">
+                  {busy ? t.loading : t.saveChanges}
+                </button>
+              </div>
+            )}
           </form>
         </div>
       ) : null}

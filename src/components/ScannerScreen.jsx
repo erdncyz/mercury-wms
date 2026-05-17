@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { applyStockChange, createProduct, findProductByBarcode, findProductByLabelNumber, uploadProductRefImage } from "../services/stockService";
+
+const SUPPORTED_SCAN_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.CODE_93,
+  Html5QrcodeSupportedFormats.CODABAR,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.PDF_417
+];
 
 function getCameraErrorMessage(err, t) {
   const message = String(err?.message || "").toLowerCase();
@@ -105,6 +120,17 @@ function mapSaveError(error, t) {
   return code ? `${t.saveError}: ${code}` : t.saveError;
 }
 
+function pickPreferredCamera(cameras) {
+  if (!Array.isArray(cameras) || cameras.length === 0) return "";
+
+  const rearCamera = cameras.find((camera) => {
+    const label = String(camera?.label || "").toLowerCase();
+    return label.includes("back") || label.includes("rear") || label.includes("environment") || label.includes("arka");
+  });
+
+  return rearCamera?.id || cameras[0]?.id || "";
+}
+
 export default function ScannerScreen({ t }) {
   const scanner = useRef(null);
   const startLockRef = useRef(false);
@@ -120,13 +146,46 @@ export default function ScannerScreen({ t }) {
   const [isSaving, setIsSaving] = useState(false);
   const [newProduct, setNewProduct] = useState(emptyProduct());
   const [refImageFile, setRefImageFile] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState("");
+  const [isLoadingCameras, setIsLoadingCameras] = useState(false);
 
   const stopScan = useCallback(async () => {
-    if (scanner.current?.isScanning) {
-      await scanner.current.stop();
+    try {
+      if (scanner.current?.isScanning) {
+        await scanner.current.stop();
+      }
+      if (scanner.current) {
+        await scanner.current.clear();
+        scanner.current = null;
+      }
+    } catch {
+      // Ignore stop errors so the next scan attempt can recover cleanly.
+    } finally {
+      setIsScanning(false);
     }
-    setIsScanning(false);
   }, []);
+
+  const loadCameras = useCallback(async () => {
+    setIsLoadingCameras(true);
+
+    try {
+      const availableCameras = await Html5Qrcode.getCameras();
+      setCameras(availableCameras);
+      setSelectedCameraId((prev) => {
+        if (prev && availableCameras.some((camera) => camera.id === prev)) {
+          return prev;
+        }
+        return pickPreferredCamera(availableCameras);
+      });
+      return availableCameras;
+    } catch (cameraError) {
+      setError(getCameraErrorMessage(cameraError, t));
+      return [];
+    } finally {
+      setIsLoadingCameras(false);
+    }
+  }, [t]);
 
   const startScan = useCallback(async () => {
     if (manualMode || startLockRef.current || scanner.current?.isScanning) return;
@@ -140,20 +199,46 @@ export default function ScannerScreen({ t }) {
       setError(t.cameraSecureContextRequired);
       setIsStarting(false);
       setIsScanning(false);
+      startLockRef.current = false;
       return;
     }
 
     try {
+      let nextCameraId = selectedCameraId;
+      if (!nextCameraId) {
+        const availableCameras = await loadCameras();
+        nextCameraId = pickPreferredCamera(availableCameras);
+      }
+
+      if (!nextCameraId) {
+        setError(t.cameraNotFound);
+        setIsScanning(false);
+        return;
+      }
+
+      // Match the inventory screen scanner flow: wait for the mount node, then start a fresh instance.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      const mountNode = document.getElementById("scanner-region");
+      if (!mountNode) {
+        throw new Error("scanner-region-not-ready");
+      }
+
       if (!scanner.current) {
         scanner.current = new Html5Qrcode("scanner-region");
       }
 
       await scanner.current.start(
-        { facingMode: "environment" },
+        nextCameraId,
         {
           fps: 16,
           qrbox: { width: 280, height: 170 },
-          aspectRatio: 1.7778
+          aspectRatio: 1.7778,
+          formatsToSupport: SUPPORTED_SCAN_FORMATS,
+          disableFlip: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
         },
         async (decodedText) => {
           setMessage("");
@@ -184,7 +269,8 @@ export default function ScannerScreen({ t }) {
           }
 
           await stopScan();
-        }
+        },
+        () => {}
       );
 
       setIsScanning(true);
@@ -202,7 +288,11 @@ export default function ScannerScreen({ t }) {
       setIsStarting(false);
       startLockRef.current = false;
     }
-  }, [manualMode, scanMode, stopScan, t]);
+  }, [loadCameras, manualMode, scanMode, selectedCameraId, stopScan, t]);
+
+  useEffect(() => {
+    loadCameras().catch(() => {});
+  }, [loadCameras]);
 
   useEffect(() => {
     if (isScanning) {
@@ -250,6 +340,21 @@ export default function ScannerScreen({ t }) {
     setError("");
     setMessage("");
     setManualMode(true);
+    setNewProduct(emptyProduct());
+    setRefImageFile(null);
+  };
+
+  const onCameraChange = async (event) => {
+    const nextCameraId = String(event.target.value || "");
+    if (!nextCameraId || nextCameraId === selectedCameraId) return;
+
+    await stopScan();
+    setSelectedCameraId(nextCameraId);
+    setScannedCode("");
+    setProduct(null);
+    setError("");
+    setMessage("");
+    setManualMode(false);
     setNewProduct(emptyProduct());
     setRefImageFile(null);
   };
@@ -388,6 +493,26 @@ export default function ScannerScreen({ t }) {
           >
             {t.scanLabel}
           </button>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <label className="block space-y-1">
+            <span className="text-[11px] text-slate-400">{t.selectCamera}</span>
+            <select
+              value={selectedCameraId}
+              onChange={onCameraChange}
+              disabled={isLoadingCameras || cameras.length === 0}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300 disabled:opacity-60"
+            >
+              {cameras.length === 0 ? <option value="">{t.loading}</option> : null}
+              {cameras.map((camera) => (
+                <option key={camera.id} value={camera.id}>
+                  {camera.label || `${t.cameraLabel} ${camera.id.slice(0, 8)}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-[11px] text-slate-400">{t.scannerFormatsHint}</p>
         </div>
 
         <button
