@@ -16,6 +16,7 @@ const AuthScreen = lazy(() => import("./components/AuthScreen"));
 const InventoryScreen = lazy(() => import("./components/InventoryScreen"));
 const ScannerScreen = lazy(() => import("./components/ScannerScreen"));
 const ImportScreen = lazy(() => import("./components/ImportScreen"));
+const CREATOR_URL = "https://erdincyilmaz.netlify.app/";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -62,6 +63,14 @@ export default function App() {
           <div>
             <h1 className="font-display text-xl font-bold">{t.appName}</h1>
             <p className="text-xs text-slate-400">{t.appSubtitle}</p>
+            <a
+              href={CREATOR_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="creator-link mt-2 inline-flex"
+            >
+              Geliştiren Erdinç Yılmaz
+            </a>
           </div>
 
           <div className="flex items-center gap-2">

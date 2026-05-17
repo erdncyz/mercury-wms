@@ -30,6 +30,34 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.creator-link {
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(245, 158, 11, 0.18));
+  color: #f8fbff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(34, 211, 238, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.creator-link:hover {
+  transform: translateY(-1px) scale(1.02);
+  border-color: rgba(245, 158, 11, 0.7);
+  box-shadow: 0 14px 30px rgba(245, 158, 11, 0.18);
+}
+
+.creator-link:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.95);
+  outline-offset: 3px;
+}
+
 .critical-pulse {
   animation: criticalPulse 0.9s ease-in-out infinite;
 }

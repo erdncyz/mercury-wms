@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { deleteProduct, deleteProductsBulk, subscribeProducts, updateProduct, uploadProductRefImage } from "../services/stockService";
+import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
+import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, updateProduct, uploadProductRefImage } from "../services/stockService";
 
 const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "features", "imageRef"];
 const OPTIONAL_NUMERIC_FIELDS = ["qtyPerBox", "totalBox", "unitKg", "totalKg", "widthCm", "lengthCm", "heightCm", "unitM3", "totalM3"];
@@ -44,6 +45,27 @@ function getCameraErrorMessage(err, t) {
   return t.cameraError;
 }
 
+function emptyEditableProduct() {
+  return {
+    name: "",
+    barcode: "",
+    labelNumber: "",
+    category: "Genel",
+    quantity: 1,
+    price: 0,
+    imageUrl: "",
+    details: {}
+  };
+}
+
+function mapSaveError(error, t) {
+  const code = String(error?.code || "").toLowerCase();
+  if (code === "permission-denied") {
+    return t.permissionDeniedHint;
+  }
+  return code ? `${t.saveError}: ${code}` : t.saveError;
+}
+
 export default function InventoryScreen({ t }) {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
@@ -58,9 +80,13 @@ export default function InventoryScreen({ t }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const scanner = useRef(null);
+  const searchScanner = useRef(null);
   const [scannerTarget, setScannerTarget] = useState("");
   const [isStartingScan, setIsStartingScan] = useState(false);
   const [scanError, setScanError] = useState("");
+  const [isSearchScannerOpen, setIsSearchScannerOpen] = useState(false);
+  const [isStartingSearchScan, setIsStartingSearchScan] = useState(false);
+  const [searchScanError, setSearchScanError] = useState("");
 
   useEffect(() => {
     const unsub = subscribeProducts((rows) => setProducts(rows));
@@ -78,6 +104,17 @@ export default function InventoryScreen({ t }) {
       return name.includes(q) || barcode.includes(q) || labelNumber.includes(q);
     });
   }, [products, search]);
+
+  const isCreating = Boolean(editing && !editing.id);
+
+  const openCreate = () => {
+    setError("");
+    setMessage("");
+    setRefImageFile(null);
+    setEditing(emptyEditableProduct());
+    setScannerTarget("");
+    setScanError("");
+  };
 
   const openEdit = (product) => {
     setError("");
@@ -114,6 +151,94 @@ export default function InventoryScreen({ t }) {
       setIsStartingScan(false);
     }
   }, []);
+
+  const stopSearchScanner = useCallback(async () => {
+    try {
+      if (searchScanner.current?.isScanning) {
+        await searchScanner.current.stop();
+      }
+      if (searchScanner.current) {
+        await searchScanner.current.clear();
+        searchScanner.current = null;
+      }
+    } catch {
+      // Ignore scanner stop errors to keep the search flow smooth.
+    } finally {
+      setIsSearchScannerOpen(false);
+      setIsStartingSearchScan(false);
+    }
+  }, []);
+
+  const applyScannedSearch = useCallback((value) => {
+    const normalized = String(value || "").trim();
+    if (!normalized) return;
+
+    setSearch(normalized);
+
+    const matchedProduct = products.find((product) => {
+      const barcode = String(product.barcode || "").trim().toLowerCase();
+      const labelNumber = String(product.labelNumber || "").trim().toLowerCase();
+      const query = normalized.toLowerCase();
+      return barcode === query || labelNumber === query;
+    });
+
+    if (matchedProduct?.id) {
+      setExpandedIds((prev) => (prev.includes(matchedProduct.id) ? prev : [...prev, matchedProduct.id]));
+      setMessage(t.productFound);
+      setError("");
+      return;
+    }
+
+    setMessage("");
+    setError(t.productNotFound);
+  }, [products, t]);
+
+  const onStartSearchScan = useCallback(async () => {
+    if (isStartingSearchScan || isSearchScannerOpen || scannerTarget) return;
+
+    setSearchScanError("");
+    setMessage("");
+    setError("");
+
+    if (!window.isSecureContext) {
+      setSearchScanError(t.cameraSecureContextRequired);
+      return;
+    }
+
+    setIsStartingSearchScan(true);
+    setIsSearchScannerOpen(true);
+
+    try {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      const mountNode = document.getElementById("inventory-search-scanner-region");
+      if (!mountNode) {
+        throw new Error("search-scanner-region-not-ready");
+      }
+
+      if (!searchScanner.current) {
+        searchScanner.current = new Html5Qrcode("inventory-search-scanner-region");
+      }
+
+      await searchScanner.current.start(
+        { facingMode: "environment" },
+        {
+          fps: 16,
+          qrbox: { width: 280, height: 170 },
+          aspectRatio: 1.7778
+        },
+        async (decodedText) => {
+          applyScannedSearch(decodedText);
+          await stopSearchScanner();
+        }
+      );
+    } catch (err) {
+      setSearchScanError(getCameraErrorMessage(err, t));
+      setIsSearchScannerOpen(false);
+    } finally {
+      setIsStartingSearchScan(false);
+    }
+  }, [applyScannedSearch, isSearchScannerOpen, isStartingSearchScan, scannerTarget, stopSearchScanner, t]);
 
   const onStartScanFor = useCallback(async (target) => {
     if (!editing || !target || isStartingScan || scannerTarget) return;
@@ -184,6 +309,12 @@ export default function InventoryScreen({ t }) {
     };
   }, [stopInlineScanner]);
 
+  useEffect(() => {
+    return () => {
+      stopSearchScanner().catch(() => {});
+    };
+  }, [stopSearchScanner]);
+
   const onDelete = async () => {
     if (!pendingDelete) return;
     try {
@@ -245,7 +376,7 @@ export default function InventoryScreen({ t }) {
   const onSaveEdit = async (event) => {
     event.preventDefault();
     if (!editing) return;
-    if (!editing.name) {
+    if (!String(editing.name || "").trim()) {
       setError(t.fillAll);
       return;
     }
@@ -257,22 +388,42 @@ export default function InventoryScreen({ t }) {
     try {
       const nextDetails = { ...(editing.details || {}) };
 
+      const normalizedBarcode = String(editing.barcode || "").trim();
+      const normalizedLabelNumber = String(editing.labelNumber || "").trim();
+
+      if (!normalizedBarcode && !normalizedLabelNumber) {
+        setError(t.codeOrLabelRequired);
+        return;
+      }
+
       if (refImageFile) {
-        const uploadedRefUrl = await uploadProductRefImage(refImageFile, editing.id);
+        const uploadKey = String(editing.id || normalizedBarcode || normalizedLabelNumber || editing.name || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "_");
+        const uploadedRefUrl = await uploadProductRefImage(refImageFile, uploadKey);
         nextDetails.imageRef = uploadedRefUrl;
       }
 
-      await updateProduct(editing.id, {
+      const payload = {
         ...editing,
-        barcode: String(editing.barcode || "").trim(),
-        labelNumber: String(editing.labelNumber || "").trim(),
+        name: String(editing.name || "").trim(),
+        barcode: normalizedBarcode,
+        labelNumber: normalizedLabelNumber,
+        category: String(editing.category || "Genel").trim() || "Genel",
+        quantity: Math.max(0, Number(editing.quantity || 0)),
+        price: Math.max(0, Number(editing.price || 0)),
         details: sanitizeDetails(nextDetails)
-      });
+      };
+
+      if (editing.id) {
+        await updateProduct(editing.id, payload);
+        setMessage(t.updateSuccess);
+      } else {
+        const created = await createProduct(payload);
+        setMessage(created.existed ? t.productMerged : t.actionDone);
+      }
 
       await closeEditModal();
-      setMessage(t.updateSuccess);
-    } catch {
-      setError(t.saveError);
+    } catch (saveError) {
+      setError(mapSaveError(saveError, t));
     } finally {
       setBusy(false);
     }
@@ -281,14 +432,42 @@ export default function InventoryScreen({ t }) {
   return (
     <section className="space-y-4">
       <div className="glass rounded-3xl p-4">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t.searchPlaceholder}
-          className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-4 text-base outline-none focus:border-cyan-300"
-        />
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.searchPlaceholder}
+            className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-4 text-base outline-none focus:border-cyan-300"
+          />
+          <button
+            type="button"
+            onClick={isSearchScannerOpen ? () => stopSearchScanner() : onStartSearchScan}
+            disabled={busy || !!scannerTarget || isStartingSearchScan}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/35 bg-cyan-300/10 px-4 py-4 text-sm font-bold text-cyan-200 disabled:opacity-50 sm:min-w-[180px]"
+          >
+            {isSearchScannerOpen ? <HiOutlineXMark size={18} /> : <HiOutlineCamera size={18} />}
+            {isSearchScannerOpen ? t.cancel : t.searchByCamera}
+          </button>
+        </div>
+
+        {isSearchScannerOpen ? (
+          <div className="mt-3 rounded-2xl border border-cyan-300/25 bg-slate-950/45 p-3">
+            <p className="mb-2 text-xs text-slate-300">{t.searchCameraHint}</p>
+            <div id="inventory-search-scanner-region" className="h-[220px] overflow-hidden rounded-xl border border-cyan-300/30 bg-slate-950/70" />
+          </div>
+        ) : null}
+
+        {searchScanError ? <p className="mt-2 text-xs text-rose-300">{searchScanError}</p> : null}
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={openCreate}
+            className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-sm font-bold text-cyan-200"
+          >
+            {t.manualAddProduct}
+          </button>
+
           <button
             type="button"
             onClick={onToggleBulkMode}
@@ -442,7 +621,53 @@ export default function InventoryScreen({ t }) {
       {editing ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4">
           <form onSubmit={onSaveEdit} className="glass w-full max-w-lg rounded-3xl p-4 space-y-3">
-            <h3 className="font-display text-xl font-bold">{t.editProduct}</h3>
+            <h3 className="font-display text-xl font-bold">{isCreating ? t.manualAddProduct : t.editProduct}</h3>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-1 col-span-2">
+                  <span className="text-[11px] text-slate-400">{t.productName}</span>
+                  <input
+                    value={editing.name ?? ""}
+                    onChange={(e) => setEditing((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder={t.productName}
+                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[11px] text-slate-400">{t.category}</span>
+                  <input
+                    value={editing.category ?? ""}
+                    onChange={(e) => setEditing((prev) => ({ ...prev, category: e.target.value }))}
+                    placeholder={t.category}
+                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[11px] text-slate-400">{t.quantityLabel}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editing.quantity ?? 0}
+                    onChange={(e) => setEditing((prev) => ({ ...prev, quantity: e.target.value }))}
+                    placeholder={t.quantityLabel}
+                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[11px] text-slate-400">{t.price}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editing.price ?? 0}
+                    onChange={(e) => setEditing((prev) => ({ ...prev, price: e.target.value }))}
+                    placeholder={t.price}
+                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                  />
+                </label>
+              </div>
+            </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
               <p className="text-xs font-semibold text-slate-300">{t.optionalIdentifiersTitle}</p>
@@ -634,7 +859,7 @@ export default function InventoryScreen({ t }) {
                 {t.cancel}
               </button>
               <button type="submit" disabled={busy} className="rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-extrabold text-slate-900 disabled:opacity-60">
-                {busy ? t.loading : t.saveChanges}
+                {busy ? t.loading : isCreating ? t.saveProduct : t.saveChanges}
               </button>
             </div>
           </form>

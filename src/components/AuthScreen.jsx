@@ -7,6 +7,8 @@ import {
 } from "firebase/auth";
 import { auth } from "../firebase";
 
+const CREATOR_URL = "https://erdincyilmaz.netlify.app/";
+
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
@@ -144,6 +146,15 @@ export default function AuthScreen({ t, onLanguageToggle }) {
             {mode === "login" ? t.switchToRegister : t.switchToLogin}
           </button>
         </p>
+
+        <a
+          href={CREATOR_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="creator-link mt-5 inline-flex"
+        >
+          Geliştiren Erdinç Yılmaz
+        </a>
       </div>
     </div>
   );
