@@ -1,0 +1,103 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isNonEmptyString(value, maxLen) {
+      return value is string && value.size() > 0 && value.size() <= maxLen;
+    }
+
+    function isValidProductData(data) {
+      return data.keys().hasOnly([
+          'name',
+          'barcode',
+          'labelNumber',
+          'category',
+          'quantity',
+          'price',
+          'imageUrl',
+          'details',
+          'updatedAt'
+        ])
+        && isNonEmptyString(data.name, 120)
+        && isNonEmptyString(data.barcode, 80)
+        && (!data.keys().hasAny(['labelNumber']) || data.labelNumber is string)
+        && isNonEmptyString(data.category, 80)
+        && data.quantity is number
+        && data.quantity >= 0
+        && data.price is number
+        && data.price >= 0
+        && (!data.keys().hasAny(['imageUrl']) || data.imageUrl is string)
+        && (!data.keys().hasAny(['details']) || isValidProductDetails(data.details))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProductDetails(details) {
+      return details is map
+        && details.keys().hasOnly([
+          'productCode',
+          'imageRef',
+          'features',
+          'containerNumber',
+          'qtyPerBox',
+          'totalBox',
+          'unitKg',
+          'totalKg',
+          'widthCm',
+          'lengthCm',
+          'heightCm',
+          'unitM3',
+          'totalM3'
+        ])
+        && (!details.keys().hasAny(['productCode']) || details.productCode is string)
+        && (!details.keys().hasAny(['imageRef']) || details.imageRef is string)
+        && (!details.keys().hasAny(['features']) || details.features is string)
+        && (!details.keys().hasAny(['containerNumber']) || details.containerNumber is string)
+        && (!details.keys().hasAny(['qtyPerBox']) || details.qtyPerBox is number)
+        && (!details.keys().hasAny(['totalBox']) || details.totalBox is number)
+        && (!details.keys().hasAny(['unitKg']) || details.unitKg is number)
+        && (!details.keys().hasAny(['totalKg']) || details.totalKg is number)
+        && (!details.keys().hasAny(['widthCm']) || details.widthCm is number)
+        && (!details.keys().hasAny(['lengthCm']) || details.lengthCm is number)
+        && (!details.keys().hasAny(['heightCm']) || details.heightCm is number)
+        && (!details.keys().hasAny(['unitM3']) || details.unitM3 is number)
+        && (!details.keys().hasAny(['totalM3']) || details.totalM3 is number);
+    }
+
+    function isValidStockLogData(data) {
+      return data.keys().hasOnly([
+          'productId',
+          'productName',
+          'type',
+          'amount',
+          'timestamp'
+        ])
+        && isNonEmptyString(data.productId, 128)
+        && isNonEmptyString(data.productName, 120)
+        && (data.type == 'IN' || data.type == 'OUT')
+        && data.amount is number
+        && data.amount > 0
+        && data.timestamp is timestamp;
+    }
+
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidProductData(request.resource.data);
+      allow update: if isSignedIn() && isValidProductData(request.resource.data);
+      allow delete: if isSignedIn();
+    }
+
+    match /stock_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidStockLogData(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
