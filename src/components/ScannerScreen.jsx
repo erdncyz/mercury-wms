@@ -248,9 +248,7 @@ export default function ScannerScreen({ t }) {
           playBeep();
 
           try {
-            const found = scanMode === "label"
-              ? await findProductByLabelNumber(normalized)
-              : await findProductByBarcode(normalized);
+            const found = await findProductByBarcode(normalized) || await findProductByLabelNumber(normalized);
 
             setProduct(found);
 
@@ -478,22 +476,13 @@ export default function ScannerScreen({ t }) {
         <h2 className="font-display text-xl font-bold">{t.scannerTitle}</h2>
         <p className="mt-1 text-sm text-slate-400">{t.scannerHint}</p>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => onSwitchScanMode("barcode")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${scanMode === "barcode" ? "bg-cyan-300 text-slate-900" : "bg-slate-900/40 text-slate-300"}`}
-          >
-            {t.scanBarcode}
-          </button>
-          <button
-            type="button"
-            onClick={() => onSwitchScanMode("label")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${scanMode === "label" ? "bg-cyan-300 text-slate-900" : "bg-slate-900/40 text-slate-300"}`}
-          >
-            {t.scanLabel}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={resetFlow}
+          className="mt-3 w-full rounded-xl bg-cyan-300 px-3 py-3 text-sm font-bold text-slate-900"
+        >
+          {t.scanAnyCode}
+        </button>
 
         <div className="mt-3 space-y-2">
           <label className="block space-y-1">
