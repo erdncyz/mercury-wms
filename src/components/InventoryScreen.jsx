@@ -87,6 +87,7 @@ export default function InventoryScreen({ t }) {
   const [isSearchScannerOpen, setIsSearchScannerOpen] = useState(false);
   const [isStartingSearchScan, setIsStartingSearchScan] = useState(false);
   const [searchScanError, setSearchScanError] = useState("");
+  const isAnyOverlayOpen = Boolean(editing || pendingDelete || pendingBulkDelete);
 
   useEffect(() => {
     const unsub = subscribeProducts((rows) => setProducts(rows));
@@ -314,6 +315,38 @@ export default function InventoryScreen({ t }) {
       stopSearchScanner().catch(() => {});
     };
   }, [stopSearchScanner]);
+
+  useEffect(() => {
+    if (!isAnyOverlayOpen) return;
+
+    const body = document.body;
+    const html = document.documentElement;
+    const scrollY = window.scrollY;
+
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPosition = body.style.position;
+    const prevBodyTop = body.style.top;
+    const prevBodyWidth = body.style.width;
+    const prevBodyTouchAction = body.style.touchAction;
+    const prevHtmlOverflow = html.style.overflow;
+
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    body.style.touchAction = "none";
+    html.style.overflow = "hidden";
+
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      body.style.position = prevBodyPosition;
+      body.style.top = prevBodyTop;
+      body.style.width = prevBodyWidth;
+      body.style.touchAction = prevBodyTouchAction;
+      html.style.overflow = prevHtmlOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isAnyOverlayOpen]);
 
   const onDelete = async () => {
     if (!pendingDelete) return;
@@ -544,26 +577,26 @@ export default function InventoryScreen({ t }) {
           const hasFeatures = typeof details.features === "string" && details.features.trim().length > 0;
 
           return (
-            <article key={p.id} className="glass rounded-2xl p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-              <div className="flex items-start gap-2">
-                <div className="flex items-start gap-2.5">
+            <article key={p.id} className="glass rounded-3xl p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:rounded-2xl sm:p-3">
+              <div className="flex min-w-0 items-start gap-2">
+                <div className="flex min-w-0 items-start gap-3">
                   {cardImage ? (
                     <img src={cardImage} alt={p.name} className="h-16 w-16 rounded-lg object-cover border border-white/10 shrink-0 sm:h-20 sm:w-20" />
                   ) : (
                     <div className="h-16 w-16 rounded-lg border border-white/10 bg-slate-900/40 sm:h-20 sm:w-20" />
                   )}
 
-                  <div>
-                    <h3 className="text-lg font-bold leading-tight text-slate-100 sm:text-xl">{p.name}</h3>
+                  <div className="min-w-0">
+                    <h3 className="text-[1.22rem] font-semibold leading-snug text-slate-100 sm:text-xl sm:font-bold">{p.name}</h3>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-2.5 rounded-xl border border-white/10 bg-slate-900/30 p-2">
+              <div className="mt-3 rounded-xl border border-white/10 bg-slate-900/30 p-2.5 sm:mt-2.5 sm:p-2">
                 <button
                   type="button"
                   onClick={() => onToggleExpanded(p.id)}
-                  className="w-full rounded-lg border border-cyan-300/20 bg-slate-950/50 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.09em] text-cyan-200"
+                  className="w-full rounded-xl border border-cyan-300/20 bg-slate-950/50 px-3 py-2 text-left text-sm font-bold tracking-[0.01em] text-cyan-200 sm:rounded-lg sm:py-1.5 sm:text-[11px] sm:font-semibold sm:uppercase sm:tracking-[0.09em]"
                 >
                   {isExpanded ? t.hideDetails : t.showDetails}
                 </button>
@@ -605,18 +638,18 @@ export default function InventoryScreen({ t }) {
               ) : null}
 
               {!bulkMode ? (
-                <div className="mt-2.5 grid grid-cols-2 gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-2.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => openEdit(p)}
-                    className="rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-3 py-1.5 text-sm font-semibold text-cyan-200"
+                    className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2.5 text-base font-semibold text-cyan-200 sm:rounded-lg sm:py-1.5 sm:text-sm"
                   >
                     {t.editProduct}
                   </button>
                   <button
                     type="button"
                     onClick={() => setPendingDelete(p)}
-                    className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-3 py-1.5 text-sm font-semibold text-rose-300"
+                    className="rounded-xl border border-rose-300/35 bg-rose-500/10 px-3 py-2.5 text-base font-semibold text-rose-300 sm:rounded-lg sm:py-1.5 sm:text-sm"
                   >
                     {t.deleteProduct}
                   </button>
@@ -628,15 +661,15 @@ export default function InventoryScreen({ t }) {
       </div>
 
       {editing ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4">
-          <form onSubmit={onSaveEdit} className="glass w-full max-w-lg rounded-3xl p-4 space-y-3">
+        <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/55 p-2 sm:grid sm:place-items-center sm:p-4">
+          <form onSubmit={onSaveEdit} className="glass mx-auto w-full max-w-lg rounded-3xl p-3 space-y-3 max-h-[calc(100dvh-1rem)] overflow-y-auto sm:p-4 sm:max-h-[calc(100dvh-2rem)]">
             {!isCreating ? <h3 className="font-display text-xl font-bold">{t.editProduct}</h3> : null}
 
             {isCreating ? <p className="text-sm text-amber-300">{t.manualAddHint}</p> : null}
 
             {!isCreating ? (
               <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <label className="space-y-1 col-span-2">
                     <span className="text-[11px] text-slate-400">{t.productName}</span>
                     <input
@@ -685,7 +718,7 @@ export default function InventoryScreen({ t }) {
             <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
               <p className="text-xs font-semibold text-slate-300">{t.optionalIdentifiersTitle}</p>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <label className="space-y-1">
                   <span className="text-[11px] text-slate-400">{t.barcode}</span>
                   <input
@@ -741,7 +774,7 @@ export default function InventoryScreen({ t }) {
             <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
               <p className="text-xs font-semibold text-slate-300">{t.optionalDetailsTitle}</p>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <label className="space-y-1">
                   <span className="text-[11px] text-slate-400">{t.productCode}</span>
                   <input
@@ -890,7 +923,7 @@ export default function InventoryScreen({ t }) {
       ) : null}
 
       {pendingDelete ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/55 p-3 sm:grid sm:place-items-center sm:p-4">
           <div className="glass w-full max-w-md rounded-3xl p-4">
             <h3 className="font-display text-lg font-bold text-slate-100">{t.deleteProduct}</h3>
             <p className="mt-2 text-sm text-slate-300">{t.deleteConfirm.replace("{name}", pendingDelete.name || "")}</p>
@@ -916,7 +949,7 @@ export default function InventoryScreen({ t }) {
       ) : null}
 
       {pendingBulkDelete ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/55 p-3 sm:grid sm:place-items-center sm:p-4">
           <div className="glass w-full max-w-md rounded-3xl p-4">
             <h3 className="font-display text-lg font-bold text-slate-100">{t.deleteSelected}</h3>
             <p className="mt-2 text-sm text-slate-300">{t.bulkDeleteConfirm.replace("{count}", String(selectedIds.length))}</p>
