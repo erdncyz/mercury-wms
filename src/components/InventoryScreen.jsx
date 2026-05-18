@@ -658,8 +658,8 @@ export default function InventoryScreen({ t }) {
       </div>
 
       {editing ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/55 p-2 sm:grid sm:place-items-center sm:p-4">
-          <form onSubmit={onSaveEdit} className="glass mx-auto w-full max-w-lg rounded-3xl p-3 space-y-3 max-h-[calc(100dvh-1rem)] overflow-y-auto sm:p-4 sm:max-h-[calc(100dvh-2rem)]">
+        <div className="fixed inset-0 z-50 overflow-y-auto overscroll-y-contain touch-pan-y bg-black/55 p-2 [-webkit-overflow-scrolling:touch] sm:grid sm:place-items-center sm:p-4">
+          <form onSubmit={onSaveEdit} className="glass mx-auto w-full max-w-lg rounded-3xl p-3 space-y-3 sm:p-4">
             {!isCreating ? <h3 className="font-display text-xl font-bold">{t.editProduct}</h3> : null}
 
             {isCreating ? <p className="text-sm text-amber-300">{t.manualAddHint}</p> : null}
