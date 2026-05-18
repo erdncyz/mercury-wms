@@ -321,27 +321,22 @@ export default function InventoryScreen({ t }) {
 
     const body = document.body;
     const html = document.documentElement;
-    const scrollY = window.scrollY;
 
     const prevBodyOverflow = body.style.overflow;
-    const prevBodyPosition = body.style.position;
-    const prevBodyTop = body.style.top;
-    const prevBodyWidth = body.style.width;
+    const prevBodyOverscrollBehavior = body.style.overscrollBehavior;
     const prevHtmlOverflow = html.style.overflow;
+    const prevHtmlOverscrollBehavior = html.style.overscrollBehavior;
 
     body.style.overflow = "hidden";
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.width = "100%";
+    body.style.overscrollBehavior = "none";
     html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
 
     return () => {
       body.style.overflow = prevBodyOverflow;
-      body.style.position = prevBodyPosition;
-      body.style.top = prevBodyTop;
-      body.style.width = prevBodyWidth;
+      body.style.overscrollBehavior = prevBodyOverscrollBehavior;
       html.style.overflow = prevHtmlOverflow;
-      window.scrollTo(0, scrollY);
+      html.style.overscrollBehavior = prevHtmlOverscrollBehavior;
     };
   }, [isAnyOverlayOpen]);
 

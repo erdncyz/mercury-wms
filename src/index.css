@@ -40,6 +40,7 @@ body {
   color: var(--text-main);
   overflow-x: hidden;
   touch-action: pan-y;
+  position: relative;
 }
 
 body::before {
@@ -47,6 +48,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  z-index: -2;
   opacity: 0.22;
   background-image: radial-gradient(rgba(255, 255, 255, 0.18) 0.45px, transparent 0.45px);
   background-size: 3px 3px;
@@ -58,12 +60,14 @@ body::after {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  z-index: -1;
   background: linear-gradient(180deg, rgba(6, 13, 24, 0) 0%, rgba(6, 13, 24, 0.3) 78%, rgba(6, 13, 24, 0.56) 100%);
 }
 
 #root {
   position: relative;
   isolation: isolate;
+  z-index: 0;
   overflow-x: clip;
 }
 
