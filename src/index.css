@@ -21,6 +21,7 @@ html {
   font-size: clamp(15px, 0.45vw + 13.7px, 17px);
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
+  overflow-x: clip;
 }
 
 body {
@@ -37,6 +38,8 @@ body {
     radial-gradient(850px 420px at 95% -14%, rgba(255, 174, 75, 0.14), transparent 58%),
     linear-gradient(180deg, #060d18 0%, #091224 100%);
   color: var(--text-main);
+  overflow-x: hidden;
+  touch-action: pan-y;
 }
 
 body::before {
@@ -61,6 +64,7 @@ body::after {
 #root {
   position: relative;
   isolation: isolate;
+  overflow-x: clip;
 }
 
 .font-display {
