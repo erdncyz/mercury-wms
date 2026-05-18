@@ -539,7 +539,7 @@ export default function InventoryScreen({ t }) {
         </div>
       </div>
 
-      <div className="max-h-[70vh] space-y-3 overflow-auto pr-1">
+      <div className="space-y-3">
         {filtered.length === 0 ? (
           <div className="glass rounded-2xl px-4 py-4 text-sm text-slate-300">
             {products.length === 0 ? t.emptyState : search.trim() ? t.productNotFound : t.emptyState}
