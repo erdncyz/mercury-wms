@@ -327,14 +327,12 @@ export default function InventoryScreen({ t }) {
     const prevBodyPosition = body.style.position;
     const prevBodyTop = body.style.top;
     const prevBodyWidth = body.style.width;
-    const prevBodyTouchAction = body.style.touchAction;
     const prevHtmlOverflow = html.style.overflow;
 
     body.style.overflow = "hidden";
     body.style.position = "fixed";
     body.style.top = `-${scrollY}px`;
     body.style.width = "100%";
-    body.style.touchAction = "none";
     html.style.overflow = "hidden";
 
     return () => {
@@ -342,7 +340,6 @@ export default function InventoryScreen({ t }) {
       body.style.position = prevBodyPosition;
       body.style.top = prevBodyTop;
       body.style.width = prevBodyWidth;
-      body.style.touchAction = prevBodyTouchAction;
       html.style.overflow = prevHtmlOverflow;
       window.scrollTo(0, scrollY);
     };
