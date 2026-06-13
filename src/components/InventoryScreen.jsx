@@ -121,6 +121,7 @@ function pickPreferredCamera(cameras) {
 export default function InventoryScreen({ t }) {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
+  const [warehouseFilter, setWarehouseFilter] = useState("");
   const [expandedIds, setExpandedIds] = useState([]);
   const [editing, setEditing] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -160,16 +161,22 @@ export default function InventoryScreen({ t }) {
   const filtered = useMemo(() => {
     const normalizeForSearch = (value) => String(value || "").toLowerCase().replace(/\s+/g, "").replace(/[-_]/g, "");
     const q = normalizeForSearch(search.trim());
-    if (!q) return products;
+    const warehouse = warehouseFilter.trim();
 
     return products.filter((p) => {
+      if (warehouse && String(p.details?.warehouseLocation || "").trim() !== warehouse) {
+        return false;
+      }
+
+      if (!q) return true;
+
       const name = normalizeForSearch(p.name);
       const barcode = normalizeForSearch(p.barcode);
       const productCode = normalizeForSearch(p.details?.productCode || p.productCode || p.details?.productcode);
 
       return name.includes(q) || barcode.includes(q) || productCode.includes(q);
     });
-  }, [products, search]);
+  }, [products, search, warehouseFilter]);
 
   const isCreating = Boolean(editing && !editing.id);
 
@@ -657,6 +664,18 @@ export default function InventoryScreen({ t }) {
           </button>
         </div>
 
+        <div className="mt-3">
+          <select
+            value={warehouseFilter}
+            onChange={(e) => setWarehouseFilter(e.target.value)}
+            className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-300 sm:max-w-[260px]"
+          >
+            <option value="">{t.allWarehouses}</option>
+            <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
+            <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
+          </select>
+        </div>
+
         {isSearchScannerOpen ? (
           <div className="mt-3 space-y-3">
             <p className="text-sm text-slate-400">{t.searchCameraHint}</p>
@@ -740,6 +759,9 @@ export default function InventoryScreen({ t }) {
           const cardImage = String(p.details?.imageRef || p.imageUrl || "").trim();
           const details = p.details || {};
           const isExpanded = expandedIds.includes(p.id);
+          const hasStockCount = details.totalProductCount !== undefined && details.totalProductCount !== null && String(details.totalProductCount).trim() !== "";
+          const stockCount = Number(details.totalProductCount);
+          const isLowStock = hasStockCount && Number.isFinite(stockCount) && stockCount <= 15;
 
           const basePairs = [
             { key: t.barcode, value: p.barcode || "-" },
@@ -783,8 +805,13 @@ export default function InventoryScreen({ t }) {
                       </p>
                     ) : null}
                     {details.totalProductCount !== undefined && details.totalProductCount !== null && String(details.totalProductCount).trim() !== "" ? (
-                      <p className="mt-1 text-sm text-slate-400">
+                      <p className={`mt-1 text-sm ${isLowStock ? "font-semibold text-rose-400" : "text-slate-400"}`}>
                         {t.totalProductCount}: {details.totalProductCount}
+                        {isLowStock ? (
+                          <span className="ml-2 inline-flex items-center rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[11px] font-bold text-rose-300">
+                            {t.lowStock}
+                          </span>
+                        ) : null}
                       </p>
                     ) : null}
                   </div>
