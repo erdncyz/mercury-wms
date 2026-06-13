@@ -4,7 +4,7 @@ import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
 import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, updateProduct, uploadProductRefImage } from "../services/stockService";
 
 const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "features", "imageRef"];
-const OPTIONAL_NUMERIC_FIELDS = ["qtyPerBox", "totalBox", "unitKg", "totalKg", "widthCm", "lengthCm", "heightCm", "unitM3", "totalM3"];
+const OPTIONAL_NUMERIC_FIELDS = ["totalProductCount", "unitKg", "totalKg", "widthCm", "lengthCm", "heightCm", "unitM3", "totalM3"];
 
 function sanitizeDetails(details) {
   const next = {};
@@ -425,12 +425,14 @@ export default function InventoryScreen({ t }) {
 
     try {
       const nextDetails = { ...(editing.details || {}) };
+      const detailsName = String(nextDetails.productCode || "").trim();
+      const normalizedQuantity = Math.max(0, Number(editing.quantity || 0));
 
       const normalizedBarcode = String(editing.barcode || "").trim();
       const normalizedLabelNumber = String(editing.labelNumber || "").trim();
 
-      if (!normalizedBarcode && !normalizedLabelNumber) {
-        setError(t.codeOrLabelRequired);
+      if (!editing.id && (!detailsName || normalizedQuantity < 1)) {
+        setError(t.productCodeAndQuantityRequired);
         return;
       }
 
@@ -444,17 +446,17 @@ export default function InventoryScreen({ t }) {
         ...editing,
         name: editing.id
           ? String(editing.name || "").trim()
-          : String(nextDetails.productCode || normalizedBarcode || normalizedLabelNumber || "").trim(),
+          : detailsName,
         barcode: normalizedBarcode,
         labelNumber: normalizedLabelNumber,
         category: editing.id ? String(editing.category || "Genel").trim() || "Genel" : "Genel",
-        quantity: editing.id ? Math.max(0, Number(editing.quantity || 0)) : 1,
+        quantity: normalizedQuantity,
         price: editing.id ? Math.max(0, Number(editing.price || 0)) : 0,
         details: sanitizeDetails(nextDetails)
       };
 
       if (!payload.name) {
-        setError(t.codeOrLabelRequired);
+        setError(editing.id ? t.fillAll : t.productCodeAndQuantityRequired);
         return;
       }
 
@@ -568,8 +570,7 @@ export default function InventoryScreen({ t }) {
           const optionalPairs = [
             { key: t.productCode, value: details.productCode },
             { key: t.containerNumber, value: details.containerNumber },
-            { key: t.qtyPerBox, value: details.qtyPerBox },
-            { key: t.totalBox, value: details.totalBox },
+            { key: t.totalProductCount, value: details.totalProductCount },
             { key: t.unitKg, value: details.unitKg },
             { key: t.totalKg, value: details.totalKg },
             { key: t.widthCm, value: details.widthCm },
@@ -686,6 +687,7 @@ export default function InventoryScreen({ t }) {
             {!isCreating ? <h3 className="font-display text-xl font-bold">{t.editProduct}</h3> : null}
 
             {isCreating ? <p className="text-sm text-amber-300">{t.manualAddHint}</p> : null}
+            {isCreating ? <p className="text-xs text-cyan-200">{t.requiredManualFields}</p> : null}
 
             {!isCreating ? (
               <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
@@ -709,10 +711,10 @@ export default function InventoryScreen({ t }) {
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className="text-[11px] text-slate-400">{t.quantityLabel}</span>
+                    <span className="text-[11px] text-slate-400">{t.quantityLabel}{isCreating ? " *" : ""}</span>
                     <input
                       type="number"
-                      min="0"
+                      min={isCreating ? "1" : "0"}
                       value={editing.quantity ?? 0}
                       onChange={(e) => setEditing((prev) => ({ ...prev, quantity: e.target.value }))}
                       placeholder={t.quantityLabel}
@@ -740,7 +742,10 @@ export default function InventoryScreen({ t }) {
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.barcode}</span>
+                  <span className="text-[11px] text-slate-400">
+                    {t.barcode}
+                    {isCreating ? ` (${t.optionalFields})` : ""}
+                  </span>
                   <input
                     value={editing.barcode ?? ""}
                     onChange={(e) => setEditing((prev) => ({ ...prev, barcode: e.target.value }))}
@@ -749,7 +754,10 @@ export default function InventoryScreen({ t }) {
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.labelNumber}</span>
+                  <span className="text-[11px] text-slate-400">
+                    {t.labelNumber}
+                    {isCreating ? ` (${t.optionalFields})` : ""}
+                  </span>
                   <input
                     value={editing.labelNumber ?? ""}
                     onChange={(e) => setEditing((prev) => ({ ...prev, labelNumber: e.target.value }))}
@@ -796,7 +804,7 @@ export default function InventoryScreen({ t }) {
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.productCode}</span>
+                  <span className="text-[11px] text-slate-400">{t.productCode}{isCreating ? " *" : ""}</span>
                   <input
                     value={editing.details?.productCode ?? ""}
                     onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), productCode: e.target.value } }))}
@@ -804,96 +812,103 @@ export default function InventoryScreen({ t }) {
                     className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                   />
                 </label>
+                {!isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.containerNumber}</span>
+                    <input
+                      value={editing.details?.containerNumber ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), containerNumber: e.target.value } }))}
+                      placeholder={t.containerNumber}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                ) : null}
                 <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.containerNumber}</span>
+                  <span className="text-[11px] text-slate-400">{t.totalProductCount}</span>
                   <input
-                    value={editing.details?.containerNumber ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), containerNumber: e.target.value } }))}
-                    placeholder={t.containerNumber}
+                    value={editing.details?.totalProductCount ?? ""}
+                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), totalProductCount: e.target.value } }))}
+                    placeholder={t.totalProductCount}
                     className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                   />
                 </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.qtyPerBox}</span>
-                  <input
-                    value={editing.details?.qtyPerBox ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), qtyPerBox: e.target.value } }))}
-                    placeholder={t.qtyPerBox}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.totalBox}</span>
-                  <input
-                    value={editing.details?.totalBox ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), totalBox: e.target.value } }))}
-                    placeholder={t.totalBox}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.unitKg}</span>
-                  <input
-                    value={editing.details?.unitKg ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), unitKg: e.target.value } }))}
-                    placeholder={t.unitKg}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.totalKg}</span>
-                  <input
-                    value={editing.details?.totalKg ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), totalKg: e.target.value } }))}
-                    placeholder={t.totalKg}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.widthCm}</span>
-                  <input
-                    value={editing.details?.widthCm ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), widthCm: e.target.value } }))}
-                    placeholder={t.widthCm}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.lengthCm}</span>
-                  <input
-                    value={editing.details?.lengthCm ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), lengthCm: e.target.value } }))}
-                    placeholder={t.lengthCm}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.heightCm}</span>
-                  <input
-                    value={editing.details?.heightCm ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), heightCm: e.target.value } }))}
-                    placeholder={t.heightCm}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.unitM3}</span>
-                  <input
-                    value={editing.details?.unitM3 ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), unitM3: e.target.value } }))}
-                    placeholder={t.unitM3}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">{t.totalM3}</span>
-                  <input
-                    value={editing.details?.totalM3 ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), totalM3: e.target.value } }))}
-                    placeholder={t.totalM3}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
+                {!isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.unitKg}</span>
+                    <input
+                      value={editing.details?.unitKg ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), unitKg: e.target.value } }))}
+                      placeholder={t.unitKg}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                ) : null}
+                {!isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.totalKg}</span>
+                    <input
+                      value={editing.details?.totalKg ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), totalKg: e.target.value } }))}
+                      placeholder={t.totalKg}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                ) : null}
+                {!isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.widthCm}</span>
+                    <input
+                      value={editing.details?.widthCm ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), widthCm: e.target.value } }))}
+                      placeholder={t.widthCm}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                ) : null}
+                {!isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.lengthCm}</span>
+                    <input
+                      value={editing.details?.lengthCm ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), lengthCm: e.target.value } }))}
+                      placeholder={t.lengthCm}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                ) : null}
+                {!isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.heightCm}</span>
+                    <input
+                      value={editing.details?.heightCm ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), heightCm: e.target.value } }))}
+                      placeholder={t.heightCm}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                ) : null}
+                {!isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.unitM3}</span>
+                    <input
+                      value={editing.details?.unitM3 ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), unitM3: e.target.value } }))}
+                      placeholder={t.unitM3}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                ) : null}
+                {!isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.totalM3}</span>
+                    <input
+                      value={editing.details?.totalM3 ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), totalM3: e.target.value } }))}
+                      placeholder={t.totalM3}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                ) : null}
                 <label className="flex items-center rounded-xl border border-dashed border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-200 cursor-pointer">
                   <input
                     type="file"

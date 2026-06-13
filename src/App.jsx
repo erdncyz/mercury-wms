@@ -3,7 +3,6 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   HiOutlineArrowRightOnRectangle,
   HiOutlineChevronDown,
-  HiOutlineDocumentArrowUp,
   HiOutlineLanguage,
   HiOutlineQrCode,
   HiOutlineSquares2X2,
@@ -15,7 +14,6 @@ import { labels } from "./i18n";
 const AuthScreen = lazy(() => import("./components/AuthScreen"));
 const InventoryScreen = lazy(() => import("./components/InventoryScreen"));
 const ScannerScreen = lazy(() => import("./components/ScannerScreen"));
-const ImportScreen = lazy(() => import("./components/ImportScreen"));
 const CREATOR_URL = "https://erdincyilmaz.netlify.app/";
 
 export default function App() {
@@ -127,12 +125,11 @@ export default function App() {
         <Suspense fallback={<div className="glass rounded-2xl p-4 text-slate-300">{t.loading}</div>}>
           {activeTab === "scan" ? <ScannerScreen t={t} /> : null}
           {activeTab === "list" ? <InventoryScreen t={t} /> : null}
-          {activeTab === "import" ? <ImportScreen t={t} /> : null}
         </Suspense>
       </main>
 
       <nav className="bottom-nav-shell fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:p-3">
-        <div className="mx-auto grid w-full max-w-4xl grid-cols-3 gap-1.5 sm:gap-2">
+        <div className="mx-auto grid w-full max-w-4xl grid-cols-2 gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={() => setActiveTab("list")}
@@ -153,17 +150,6 @@ export default function App() {
           >
             <HiOutlineQrCode className="h-5 w-5 shrink-0 sm:h-[22px] sm:w-[22px]" />
             <span className="truncate">{t.scanTab}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("import")}
-            className={`tab-pill flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[0.95rem] tracking-[0.005em] sm:gap-2 sm:rounded-2xl sm:py-4 sm:text-base ${
-              activeTab === "import" ? "tab-pill-active" : ""
-            }`}
-          >
-            <HiOutlineDocumentArrowUp className="h-5 w-5 shrink-0 sm:h-[22px] sm:w-[22px]" />
-            <span className="truncate">{t.importTab}</span>
           </button>
         </div>
       </nav>

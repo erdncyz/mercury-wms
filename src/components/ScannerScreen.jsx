@@ -64,8 +64,7 @@ function emptyProduct() {
     details: {
       productCode: "",
       containerNumber: "",
-      qtyPerBox: "",
-      totalBox: "",
+      totalProductCount: "",
       unitKg: "",
       totalKg: "",
       widthCm: "",
@@ -91,8 +90,7 @@ function sanitizeDetails(details) {
     containerNumber: String(details?.containerNumber || "").trim(),
     imageRef: String(details?.imageRef || "").trim(),
     features: String(details?.features || "").trim(),
-    qtyPerBox: toNumberOrNull(details?.qtyPerBox),
-    totalBox: toNumberOrNull(details?.totalBox),
+    totalProductCount: toNumberOrNull(details?.totalProductCount),
     unitKg: toNumberOrNull(details?.unitKg),
     totalKg: toNumberOrNull(details?.totalKg),
     widthCm: toNumberOrNull(details?.widthCm),
@@ -406,20 +404,16 @@ export default function ScannerScreen({ t }) {
       ? String(scannedCode || newProduct.labelNumber || "").trim()
       : String(newProduct.labelNumber || "").trim();
 
-    if (!resolvedBarcode && !resolvedLabel) {
-      setError(t.codeOrLabelRequired);
-      return;
-    }
-
     const detailsName = String(newProduct.details?.productCode || "").trim();
-    const fallbackName = String(resolvedBarcode || resolvedLabel || "").trim();
-    const resolvedName = detailsName || fallbackName;
-    const resolvedQuantity = 1;
+    const parsedQuantity = Number(newProduct.quantity);
+    const resolvedQuantity = Number.isFinite(parsedQuantity) ? parsedQuantity : NaN;
 
-    if (!resolvedName) {
-      setError(t.codeOrLabelRequired);
+    if (!detailsName || !Number.isFinite(resolvedQuantity) || resolvedQuantity < 1) {
+      setError(t.productCodeAndQuantityRequired);
       return;
     }
+
+    const resolvedName = detailsName;
 
     setError("");
     setMessage("");
@@ -439,7 +433,7 @@ export default function ScannerScreen({ t }) {
       }
 
       const created = await createProduct({
-        barcode: resolvedBarcode || resolvedLabel,
+        barcode: resolvedBarcode,
         labelNumber: resolvedLabel,
         name: resolvedName,
         category: "Genel",
@@ -450,7 +444,7 @@ export default function ScannerScreen({ t }) {
 
       setProduct({
         id: created.id,
-        barcode: resolvedBarcode || resolvedLabel,
+        barcode: resolvedBarcode,
         labelNumber: resolvedLabel,
         name: resolvedName,
         category: "Genel",
@@ -460,7 +454,7 @@ export default function ScannerScreen({ t }) {
       });
 
       setManualMode(false);
-      setScannedCode(resolvedBarcode || resolvedLabel);
+      setScannedCode(resolvedBarcode || resolvedLabel || detailsName);
       setRefImageFile(null);
       setMessage(created.existed ? t.productMerged : t.actionDone);
     } catch (saveError) {
@@ -590,13 +584,14 @@ export default function ScannerScreen({ t }) {
       {(manualMode || (scannedCode && !product)) ? (
         <form onSubmit={onCreateProduct} className="glass space-y-3 rounded-3xl p-4">
           <p className="text-sm text-amber-300">{scannedCode ? t.productNotFound : t.manualAddHint}</p>
+          <p className="text-xs text-cyan-200">{t.requiredManualFields}</p>
 
           <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
             <p className="text-xs font-semibold text-slate-300">{t.optionalIdentifiersTitle}</p>
 
             <div className="grid grid-cols-2 gap-2">
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.barcode}</span>
+                <span className="text-[11px] text-slate-400">{t.barcode} ({t.optionalFields})</span>
                 <input
                   value={newProduct.barcode || ""}
                   onChange={(e) => setNewProduct((s) => ({ ...s, barcode: e.target.value }))}
@@ -605,7 +600,7 @@ export default function ScannerScreen({ t }) {
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.labelNumber}</span>
+                <span className="text-[11px] text-slate-400">{t.labelNumber} ({t.optionalFields})</span>
                 <input
                   value={newProduct.labelNumber || ""}
                   onChange={(e) => setNewProduct((s) => ({ ...s, labelNumber: e.target.value }))}
@@ -635,7 +630,7 @@ export default function ScannerScreen({ t }) {
 
             <div className="grid grid-cols-2 gap-2">
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.productCode}</span>
+                <span className="text-[11px] text-slate-400">{t.productCode} *</span>
                 <input
                   value={newProduct.details?.productCode || ""}
                   onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), productCode: e.target.value } }))}
@@ -644,92 +639,22 @@ export default function ScannerScreen({ t }) {
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.containerNumber}</span>
+                <span className="text-[11px] text-slate-400">{t.quantityLabel} *</span>
                 <input
-                  value={newProduct.details?.containerNumber || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), containerNumber: e.target.value } }))}
-                  placeholder={t.containerNumber}
+                  type="number"
+                  min="1"
+                  value={newProduct.quantity ?? 1}
+                  onChange={(e) => setNewProduct((s) => ({ ...s, quantity: e.target.value }))}
+                  placeholder={t.quantityLabel}
                   className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.qtyPerBox}</span>
+                <span className="text-[11px] text-slate-400">{t.totalProductCount}</span>
                 <input
-                  value={newProduct.details?.qtyPerBox || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), qtyPerBox: e.target.value } }))}
-                  placeholder={t.qtyPerBox}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.totalBox}</span>
-                <input
-                  value={newProduct.details?.totalBox || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), totalBox: e.target.value } }))}
-                  placeholder={t.totalBox}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.unitKg}</span>
-                <input
-                  value={newProduct.details?.unitKg || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), unitKg: e.target.value } }))}
-                  placeholder={t.unitKg}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.totalKg}</span>
-                <input
-                  value={newProduct.details?.totalKg || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), totalKg: e.target.value } }))}
-                  placeholder={t.totalKg}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.widthCm}</span>
-                <input
-                  value={newProduct.details?.widthCm || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), widthCm: e.target.value } }))}
-                  placeholder={t.widthCm}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.lengthCm}</span>
-                <input
-                  value={newProduct.details?.lengthCm || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), lengthCm: e.target.value } }))}
-                  placeholder={t.lengthCm}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.heightCm}</span>
-                <input
-                  value={newProduct.details?.heightCm || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), heightCm: e.target.value } }))}
-                  placeholder={t.heightCm}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.unitM3}</span>
-                <input
-                  value={newProduct.details?.unitM3 || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), unitM3: e.target.value } }))}
-                  placeholder={t.unitM3}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.totalM3}</span>
-                <input
-                  value={newProduct.details?.totalM3 || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), totalM3: e.target.value } }))}
-                  placeholder={t.totalM3}
+                  value={newProduct.details?.totalProductCount || ""}
+                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), totalProductCount: e.target.value } }))}
+                  placeholder={t.totalProductCount}
                   className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                 />
               </label>
