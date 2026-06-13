@@ -85,6 +85,39 @@ function getImageFileFromClipboardEvent(event) {
   return imageItem?.getAsFile() || null;
 }
 
+function playBeep() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+
+  const ctx = new AudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "sine";
+  osc.frequency.value = 960;
+  gain.gain.value = 0.03;
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+
+  setTimeout(() => {
+    osc.stop();
+    ctx.close();
+  }, 120);
+}
+
+function pickPreferredCamera(cameras) {
+  if (!Array.isArray(cameras) || cameras.length === 0) return "";
+
+  const rearCamera = cameras.find((camera) => {
+    const label = String(camera?.label || "").toLowerCase();
+    return label.includes("back") || label.includes("rear") || label.includes("environment") || label.includes("arka");
+  });
+
+  return rearCamera?.id || cameras[0]?.id || "";
+}
+
 export default function InventoryScreen({ t }) {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
@@ -244,12 +277,20 @@ export default function InventoryScreen({ t }) {
         throw new Error("search-scanner-region-not-ready");
       }
 
+      let nextCameraId = "";
+      try {
+        const availableCameras = await Html5Qrcode.getCameras();
+        nextCameraId = pickPreferredCamera(availableCameras);
+      } catch {
+        nextCameraId = "";
+      }
+
       if (!searchScanner.current) {
         searchScanner.current = new Html5Qrcode("inventory-search-scanner-region");
       }
 
       await searchScanner.current.start(
-        { facingMode: "environment" },
+        nextCameraId || { facingMode: "environment" },
         {
           fps: 16,
           qrbox: { width: 280, height: 170 },
@@ -261,9 +302,11 @@ export default function InventoryScreen({ t }) {
           }
         },
         async (decodedText) => {
+          playBeep();
           applyScannedSearch(decodedText);
           await stopSearchScanner();
-        }
+        },
+        () => {}
       );
     } catch (err) {
       setSearchScanError(getCameraErrorMessage(err, t));
