@@ -139,6 +139,9 @@ export default function InventoryScreen({ t }) {
   const [isSearchScannerOpen, setIsSearchScannerOpen] = useState(false);
   const [isStartingSearchScan, setIsStartingSearchScan] = useState(false);
   const [searchScanError, setSearchScanError] = useState("");
+  const [searchCameras, setSearchCameras] = useState([]);
+  const [selectedSearchCameraId, setSelectedSearchCameraId] = useState("");
+  const [isLoadingSearchCameras, setIsLoadingSearchCameras] = useState(false);
   const isAnyOverlayOpen = Boolean(editing || pendingDelete || pendingBulkDelete);
 
   const onPasteRefImage = useCallback((event) => {
@@ -254,6 +257,27 @@ export default function InventoryScreen({ t }) {
     setError(t.productNotFound);
   }, [products, t]);
 
+  const loadSearchCameras = useCallback(async () => {
+    setIsLoadingSearchCameras(true);
+
+    try {
+      const availableCameras = await Html5Qrcode.getCameras();
+      setSearchCameras(availableCameras);
+      setSelectedSearchCameraId((prev) => {
+        if (prev && availableCameras.some((camera) => camera.id === prev)) {
+          return prev;
+        }
+        return pickPreferredCamera(availableCameras);
+      });
+      return availableCameras;
+    } catch (cameraError) {
+      setSearchScanError(getCameraErrorMessage(cameraError, t));
+      return [];
+    } finally {
+      setIsLoadingSearchCameras(false);
+    }
+  }, [t]);
+
   const onStartSearchScan = useCallback(async () => {
     if (isStartingSearchScan || isSearchScannerOpen || scannerTarget) return;
 
@@ -277,12 +301,10 @@ export default function InventoryScreen({ t }) {
         throw new Error("search-scanner-region-not-ready");
       }
 
-      let nextCameraId = "";
-      try {
-        const availableCameras = await Html5Qrcode.getCameras();
+      let nextCameraId = selectedSearchCameraId;
+      if (!nextCameraId) {
+        const availableCameras = await loadSearchCameras();
         nextCameraId = pickPreferredCamera(availableCameras);
-      } catch {
-        nextCameraId = "";
       }
 
       if (!searchScanner.current) {
@@ -314,7 +336,59 @@ export default function InventoryScreen({ t }) {
     } finally {
       setIsStartingSearchScan(false);
     }
-  }, [applyScannedSearch, isSearchScannerOpen, isStartingSearchScan, scannerTarget, stopSearchScanner, t]);
+  }, [applyScannedSearch, isSearchScannerOpen, isStartingSearchScan, loadSearchCameras, scannerTarget, selectedSearchCameraId, stopSearchScanner, t]);
+
+  const onSearchCameraChange = useCallback(async (event) => {
+    const nextCameraId = String(event.target.value || "");
+    if (!nextCameraId || nextCameraId === selectedSearchCameraId) return;
+
+    setSelectedSearchCameraId(nextCameraId);
+
+    if (!isSearchScannerOpen) return;
+
+    try {
+      if (searchScanner.current?.isScanning) {
+        await searchScanner.current.stop();
+      }
+      if (searchScanner.current) {
+        await searchScanner.current.clear();
+        searchScanner.current = null;
+      }
+
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      const mountNode = document.getElementById("inventory-search-scanner-region");
+      if (!mountNode) return;
+
+      searchScanner.current = new Html5Qrcode("inventory-search-scanner-region");
+
+      await searchScanner.current.start(
+        nextCameraId || { facingMode: "environment" },
+        {
+          fps: 16,
+          qrbox: { width: 280, height: 170 },
+          aspectRatio: 1.7778,
+          formatsToSupport: SUPPORTED_SCAN_FORMATS,
+          disableFlip: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
+        },
+        async (decodedText) => {
+          playBeep();
+          applyScannedSearch(decodedText);
+          await stopSearchScanner();
+        },
+        () => {}
+      );
+    } catch (err) {
+      setSearchScanError(getCameraErrorMessage(err, t));
+    }
+  }, [applyScannedSearch, isSearchScannerOpen, selectedSearchCameraId, stopSearchScanner, t]);
+
+  useEffect(() => {
+    loadSearchCameras().catch(() => {});
+  }, [loadSearchCameras]);
 
   const onStartScanFor = useCallback(async (target) => {
     if (!editing || !target || isStartingScan || scannerTarget) return;
@@ -584,9 +658,32 @@ export default function InventoryScreen({ t }) {
         </div>
 
         {isSearchScannerOpen ? (
-          <div className="mt-3 rounded-2xl border border-cyan-300/25 bg-slate-950/45 p-3">
-            <p className="mb-2 text-xs text-slate-300">{t.searchCameraHint}</p>
-            <div id="inventory-search-scanner-region" className="h-[220px] overflow-hidden rounded-xl border border-cyan-300/30 bg-slate-950/70" />
+          <div className="mt-3 space-y-3">
+            <p className="text-sm text-slate-400">{t.searchCameraHint}</p>
+
+            <div className="space-y-2">
+              <label className="block space-y-1">
+                <span className="text-[11px] text-slate-400">{t.selectCamera}</span>
+                <select
+                  value={selectedSearchCameraId}
+                  onChange={onSearchCameraChange}
+                  disabled={isLoadingSearchCameras || searchCameras.length === 0}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300 disabled:opacity-60"
+                >
+                  {searchCameras.length === 0 ? <option value="">{t.loading}</option> : null}
+                  {searchCameras.map((camera) => (
+                    <option key={camera.id} value={camera.id}>
+                      {camera.label || `${t.cameraLabel} ${camera.id.slice(0, 8)}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-[11px] text-slate-400">{t.scannerFormatsHint}</p>
+            </div>
+
+            <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/40 p-2">
+              <div id="inventory-search-scanner-region" className="min-h-[220px] rounded-2xl" />
+            </div>
           </div>
         ) : null}
 
@@ -640,15 +737,13 @@ export default function InventoryScreen({ t }) {
         ) : null}
 
         {filtered.map((p) => {
-          const qty = Number(p.quantity || 0);
           const cardImage = String(p.details?.imageRef || p.imageUrl || "").trim();
           const details = p.details || {};
           const isExpanded = expandedIds.includes(p.id);
 
           const basePairs = [
             { key: t.barcode, value: p.barcode || "-" },
-            { key: t.price, value: Number(p.price || 0).toFixed(2) },
-            { key: t.quantityLabel, value: String(qty) }
+            { key: t.price, value: Number(p.price || 0).toFixed(2) }
           ];
 
           const optionalPairs = [

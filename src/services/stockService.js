@@ -201,15 +201,18 @@ export async function applyStockChange({ productId, productName, amount, type })
     const snap = await tx.get(productDoc);
     if (!snap.exists()) throw new Error("Product not found");
 
-    const currentQty = Number(snap.data().quantity || 0);
-    const nextQty = type === "IN" ? currentQty + parsedAmount : currentQty - parsedAmount;
+    const data = snap.data();
+    const currentCount = Number(data.details?.totalProductCount || 0);
+    const nextCount = type === "IN" ? currentCount + parsedAmount : currentCount - parsedAmount;
 
-    if (nextQty < 0) {
+    if (nextCount < 0) {
       throw new Error("Insufficient stock");
     }
 
+    const nextDetails = { ...(data.details || {}), totalProductCount: nextCount };
+
     tx.update(productDoc, {
-      quantity: nextQty,
+      details: nextDetails,
       updatedAt: serverTimestamp()
     });
   });

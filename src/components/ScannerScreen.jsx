@@ -393,9 +393,9 @@ export default function ScannerScreen({ t }) {
       });
 
       setProduct((prev) => {
-        const current = Number(prev.quantity || 0);
+        const current = Number(prev.details?.totalProductCount || 0);
         const next = type === "IN" ? current + parsed : current - parsed;
-        return { ...prev, quantity: next };
+        return { ...prev, details: { ...(prev.details || {}), totalProductCount: next } };
       });
 
       setMessage(t.actionDone);
@@ -551,7 +551,7 @@ export default function ScannerScreen({ t }) {
           <h3 className="mt-1 text-2xl font-bold">{product.name}</h3>
           <p className="mt-1 text-sm text-slate-400">{t.barcode}: {product.barcode}</p>
           <p className="mt-3 text-lg">
-            {t.currentStock}: <span className="font-extrabold text-cyan-300">{product.quantity}</span>
+            {t.currentStock}: <span className="font-extrabold text-cyan-300">{Number(product.details?.totalProductCount || 0)}</span>
           </p>
 
           <div className="mt-4">
