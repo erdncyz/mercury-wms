@@ -595,7 +595,10 @@ export default function InventoryScreen({ t }) {
                   )}
 
                   <div className="min-w-0">
-                    <h3 className="text-[1.22rem] font-semibold leading-snug text-slate-100 sm:text-xl sm:font-bold">{p.name}</h3>
+                    <h3 className="text-[1.22rem] font-semibold leading-snug text-slate-100 sm:text-xl sm:font-bold">
+                      {p.name}
+                      {details.productCode ? ` - ${details.productCode}` : ""}
+                    </h3>
                   </div>
                 </div>
               </div>
@@ -729,10 +732,10 @@ export default function InventoryScreen({ t }) {
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className="text-[11px] text-slate-400">{t.quantityLabel}{isCreating ? " *" : ""}</span>
+                    <span className="text-[11px] text-slate-400">{t.quantityLabel}</span>
                     <input
                       type="number"
-                      min={isCreating ? "1" : "0"}
+                      min="0"
                       value={editing.quantity ?? 0}
                       onChange={(e) => setEditing((prev) => ({ ...prev, quantity: e.target.value }))}
                       placeholder={t.quantityLabel}
