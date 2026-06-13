@@ -409,10 +409,9 @@ export default function ScannerScreen({ t }) {
 
     const detailsName = String(newProduct.details?.productCode || "").trim();
     const manualName = String(newProduct.name || "").trim();
-    const parsedQuantity = Number(newProduct.quantity);
-    const resolvedQuantity = Number.isFinite(parsedQuantity) ? parsedQuantity : NaN;
+    const resolvedQuantity = 1;
 
-    if (!detailsName || !Number.isFinite(resolvedQuantity) || resolvedQuantity < 1) {
+    if (!detailsName) {
       setError(t.productCodeAndQuantityRequired);
       return;
     }
@@ -598,17 +597,6 @@ export default function ScannerScreen({ t }) {
                   value={newProduct.name || ""}
                   onChange={(e) => setNewProduct((s) => ({ ...s, name: e.target.value }))}
                   placeholder={t.manualProductName}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.quantityLabel} *</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={newProduct.quantity ?? 1}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, quantity: e.target.value }))}
-                  placeholder={t.quantityLabel}
                   className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                 />
               </label>

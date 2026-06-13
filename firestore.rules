@@ -10,6 +10,10 @@ service cloud.firestore {
       return value is string && value.size() > 0 && value.size() <= maxLen;
     }
 
+    function isString(value, maxLen) {
+      return value is string && value.size() <= maxLen;
+    }
+
     function isValidProductData(data) {
       return data.keys().hasOnly([
           'name',
@@ -23,8 +27,8 @@ service cloud.firestore {
           'updatedAt'
         ])
         && isNonEmptyString(data.name, 120)
-        && isNonEmptyString(data.barcode, 80)
-        && (!data.keys().hasAny(['labelNumber']) || data.labelNumber is string)
+        && isString(data.barcode, 80)
+        && (!data.keys().hasAny(['labelNumber']) || isString(data.labelNumber, 80))
         && isNonEmptyString(data.category, 80)
         && data.quantity is number
         && data.quantity >= 0
@@ -41,7 +45,9 @@ service cloud.firestore {
           'productCode',
           'imageRef',
           'features',
+          'warehouseLocation',
           'containerNumber',
+          'totalProductCount',
           'qtyPerBox',
           'totalBox',
           'unitKg',
@@ -55,7 +61,9 @@ service cloud.firestore {
         && (!details.keys().hasAny(['productCode']) || details.productCode is string)
         && (!details.keys().hasAny(['imageRef']) || details.imageRef is string)
         && (!details.keys().hasAny(['features']) || details.features is string)
+        && (!details.keys().hasAny(['warehouseLocation']) || details.warehouseLocation is string)
         && (!details.keys().hasAny(['containerNumber']) || details.containerNumber is string)
+        && (!details.keys().hasAny(['totalProductCount']) || details.totalProductCount is number)
         && (!details.keys().hasAny(['qtyPerBox']) || details.qtyPerBox is number)
         && (!details.keys().hasAny(['totalBox']) || details.totalBox is number)
         && (!details.keys().hasAny(['unitKg']) || details.unitKg is number)

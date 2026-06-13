@@ -432,7 +432,7 @@ export default function InventoryScreen({ t }) {
       const normalizedBarcode = String(editing.barcode || "").trim();
       const normalizedLabelNumber = String(editing.labelNumber || "").trim();
 
-      if (!editing.id && (!detailsName || normalizedQuantity < 1)) {
+      if (!editing.id && !detailsName) {
         setError(t.productCodeAndQuantityRequired);
         return;
       }
@@ -451,7 +451,7 @@ export default function InventoryScreen({ t }) {
         barcode: normalizedBarcode,
         labelNumber: normalizedLabelNumber,
         category: editing.id ? String(editing.category || "Genel").trim() || "Genel" : "Genel",
-        quantity: normalizedQuantity,
+        quantity: editing.id ? normalizedQuantity : 1,
         price: editing.id ? Math.max(0, Number(editing.price || 0)) : 0,
         details: sanitizeDetails(nextDetails)
       };
@@ -700,17 +700,6 @@ export default function InventoryScreen({ t }) {
                       value={editing.name ?? ""}
                       onChange={(e) => setEditing((prev) => ({ ...prev, name: e.target.value }))}
                       placeholder={t.manualProductName}
-                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[11px] text-slate-400">{t.quantityLabel} *</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={editing.quantity ?? 1}
-                      onChange={(e) => setEditing((prev) => ({ ...prev, quantity: e.target.value }))}
-                      placeholder={t.quantityLabel}
                       className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                     />
                   </label>
