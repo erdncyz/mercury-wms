@@ -143,12 +143,14 @@ export default function ScannerScreen({ t }) {
   const [, setIsStarting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [manualMode, setManualMode] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState("");
   const [scannedCode, setScannedCode] = useState("");
   const [product, setProduct] = useState(null);
   const [amount, setAmount] = useState(1);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isStockUpdating, setIsStockUpdating] = useState(false);
   const [newProduct, setNewProduct] = useState(emptyProduct());
   const [refImageFile, setRefImageFile] = useState(null);
   const [cameras, setCameras] = useState([]);
@@ -321,6 +323,7 @@ export default function ScannerScreen({ t }) {
   const resetFlow = async () => {
     setScannedCode("");
     setManualMode(false);
+    setManualBarcode("");
     setProduct(null);
     setAmount(1);
     setError("");
@@ -372,7 +375,39 @@ export default function ScannerScreen({ t }) {
     await startScan();
   };
 
+  const onManualBarcodeSubmit = async (event) => {
+    event.preventDefault();
+
+    const normalized = String(manualBarcode || "").trim();
+    if (!normalized) {
+      setError(t.invalidAmount);
+      return;
+    }
+
+    setMessage("");
+    setError("");
+
+    await stopScan();
+    setScannedCode(normalized);
+
+    try {
+      const found = await findProductByBarcode(normalized);
+      setProduct(found);
+
+      if (!found) {
+        setManualMode(true);
+        setNewProduct((prev) => ({ ...prev, barcode: normalized }));
+      } else {
+        setManualMode(false);
+      }
+    } catch {
+      setError(t.saveError);
+    }
+  };
+
   const onStockAction = async (type) => {
+    if (isStockUpdating) return;
+
     const parsed = Number(amount);
     if (!parsed || parsed < 1) {
       setError(t.invalidAmount);
@@ -383,6 +418,7 @@ export default function ScannerScreen({ t }) {
 
     setError("");
     setMessage("");
+    setIsStockUpdating(true);
 
     try {
       await applyStockChange({
@@ -401,6 +437,8 @@ export default function ScannerScreen({ t }) {
       setMessage(t.actionDone);
     } catch (e) {
       setError(e.message === "Insufficient stock" ? t.notEnoughStock : t.saveError);
+    } finally {
+      setIsStockUpdating(false);
     }
   };
 
@@ -481,6 +519,21 @@ export default function ScannerScreen({ t }) {
         >
           {t.scanAnyCode}
         </button>
+
+        <form onSubmit={onManualBarcodeSubmit} className="mt-3 flex gap-2">
+          <input
+            value={manualBarcode}
+            onChange={(e) => setManualBarcode(e.target.value)}
+            placeholder={t.manualBarcodeEntry}
+            className="flex-1 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+          />
+          <button
+            type="submit"
+            className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-200"
+          >
+            {t.manualBarcodeSearch}
+          </button>
+        </form>
 
         <div className="mt-3 space-y-2">
           <label className="block space-y-1">
@@ -569,14 +622,16 @@ export default function ScannerScreen({ t }) {
             <button
               type="button"
               onClick={() => onStockAction("IN")}
-              className="rounded-2xl bg-emerald-500 px-4 py-4 text-lg font-bold"
+              disabled={isStockUpdating}
+              className="rounded-2xl bg-emerald-500 px-4 py-4 text-lg font-bold disabled:opacity-60"
             >
               {t.addStock}
             </button>
             <button
               type="button"
               onClick={() => onStockAction("OUT")}
-              className="rounded-2xl bg-rose-500 px-4 py-4 text-lg font-bold"
+              disabled={isStockUpdating}
+              className="rounded-2xl bg-rose-500 px-4 py-4 text-lg font-bold disabled:opacity-60"
             >
               {t.removeStock}
             </button>
