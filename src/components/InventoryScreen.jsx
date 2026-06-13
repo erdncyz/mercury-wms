@@ -305,6 +305,19 @@ export default function InventoryScreen({ t }) {
   }, [editing, stopInlineScanner]);
 
   useEffect(() => {
+    if (!editing) return;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        closeEditModal().catch(() => {});
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [closeEditModal, editing]);
+
+  useEffect(() => {
     return () => {
       stopInlineScanner().catch(() => {});
     };
@@ -653,8 +666,23 @@ export default function InventoryScreen({ t }) {
       </div>
 
       {editing ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto overscroll-y-contain touch-pan-y bg-black/55 p-2 [-webkit-overflow-scrolling:touch] sm:grid sm:place-items-center sm:p-4">
-          <form onSubmit={onSaveEdit} className="glass mx-auto w-full max-w-lg rounded-3xl p-3 space-y-3 sm:p-4">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto overscroll-y-contain touch-pan-y bg-black/55 p-2 [-webkit-overflow-scrolling:touch] sm:grid sm:place-items-center sm:p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeEditModal().catch(() => {});
+            }
+          }}
+        >
+          <form onSubmit={onSaveEdit} className="glass relative mx-auto w-full max-w-lg rounded-3xl p-3 space-y-3 sm:p-4">
+            <button
+              type="button"
+              onClick={() => closeEditModal()}
+              aria-label={t.cancel}
+              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-slate-900/40 text-slate-200 transition hover:border-cyan-300/40 hover:text-cyan-200"
+            >
+              <HiOutlineXMark size={16} />
+            </button>
             {!isCreating ? <h3 className="font-display text-xl font-bold">{t.editProduct}</h3> : null}
 
             {isCreating ? <p className="text-sm text-amber-300">{t.manualAddHint}</p> : null}
