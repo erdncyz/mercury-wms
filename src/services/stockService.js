@@ -69,26 +69,12 @@ export async function findProductByBarcode(barcode) {
   return { id: item.id, ...item.data() };
 }
 
-export async function findProductByLabelNumber(labelNumber) {
-  const q = query(collection(db, "products"), where("labelNumber", "==", labelNumber), limit(1));
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const item = snap.docs[0];
-  return { id: item.id, ...item.data() };
-}
-
-export async function findExistingProduct({ barcode, labelNumber }) {
+export async function findExistingProduct({ barcode }) {
   const normalizedBarcode = String(barcode || "").trim();
-  const normalizedLabel = String(labelNumber || "").trim();
 
   if (normalizedBarcode) {
     const byBarcode = await findProductByBarcode(normalizedBarcode);
     if (byBarcode) return byBarcode;
-  }
-
-  if (normalizedLabel) {
-    const byLabel = await findProductByLabelNumber(normalizedLabel);
-    if (byLabel) return byLabel;
   }
 
   return null;
@@ -97,14 +83,13 @@ export async function findExistingProduct({ barcode, labelNumber }) {
 export async function createProduct(payload) {
   const details = payload.details && typeof payload.details === "object" ? payload.details : {};
   const normalizedBarcode = String(payload.barcode || "").trim();
-  const normalizedLabel = String(payload.labelNumber || "").trim();
   const normalizedName = String(payload.name || "").trim();
   const normalizedCategory = String(payload.category || "Genel").trim() || "Genel";
   const normalizedImageUrl = String(payload.imageUrl || "").trim();
   const incomingQty = Number(payload.quantity || 0);
   const incomingPrice = Number(payload.price || 0);
 
-  const existing = await findExistingProduct({ barcode: normalizedBarcode, labelNumber: normalizedLabel });
+  const existing = await findExistingProduct({ barcode: normalizedBarcode });
 
   if (existing) {
     const productRef = doc(db, "products", existing.id);
@@ -114,7 +99,6 @@ export async function createProduct(payload) {
       tx.update(productRef, {
         name: normalizedName || existing.name,
         barcode: normalizedBarcode || existing.barcode,
-        labelNumber: normalizedLabel || existing.labelNumber || "",
         category: normalizedCategory || existing.category,
         quantity: nextQty,
         price: Number.isFinite(incomingPrice) && incomingPrice > 0 ? incomingPrice : Number(existing.price || 0),
@@ -144,7 +128,6 @@ export async function createProduct(payload) {
   const productRef = await addDoc(collection(db, "products"), {
     name: normalizedName,
     barcode: normalizedBarcode,
-    labelNumber: normalizedLabel,
     category: normalizedCategory,
     quantity: incomingQty,
     price: incomingPrice,
@@ -183,7 +166,6 @@ export async function updateProduct(productId, payload) {
   const nextData = {
     name: String(payload.name || "").trim(),
     barcode: String(payload.barcode || "").trim(),
-    labelNumber: String(payload.labelNumber || "").trim(),
     category: String(payload.category || "Genel").trim() || "Genel",
     quantity: Number(payload.quantity || 0),
     price: Number(payload.price || 0),
@@ -257,7 +239,6 @@ function normalizeImportedRow(row) {
   return {
     name: String(row.name || "").trim(),
     barcode: String(row.barcode || "").trim(),
-    labelNumber: String(row.labelNumber || "").trim(),
     category: String(row.category || "Genel").trim() || "Genel",
     quantity: Number.isFinite(quantity) ? quantity : NaN,
     price: Number.isFinite(price) ? price : NaN,
@@ -290,7 +271,7 @@ export async function importProductsBulk(rawRows, onProgress) {
     }
 
     try {
-      const existing = await findExistingProduct({ barcode: row.barcode, labelNumber: row.labelNumber });
+      const existing = await findExistingProduct({ barcode: row.barcode });
 
       if (!existing) {
         await createProduct(row);
@@ -307,7 +288,6 @@ export async function importProductsBulk(rawRows, onProgress) {
         tx.update(productRef, {
           name: row.name,
           barcode: row.barcode || existing.barcode,
-          labelNumber: row.labelNumber || existing.labelNumber || "",
           category: row.category,
           quantity: nextQty,
           price: Number(row.price),

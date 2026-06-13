@@ -1,10 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
 import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, updateProduct, uploadProductRefImage } from "../services/stockService";
 
 const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "warehouseLocation", "features", "imageRef"];
 const OPTIONAL_NUMERIC_FIELDS = ["totalProductCount", "unitKg", "totalKg", "widthCm", "lengthCm", "heightCm", "unitM3", "totalM3"];
+const SUPPORTED_SCAN_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.CODE_93,
+  Html5QrcodeSupportedFormats.CODABAR,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.PDF_417
+];
 
 function sanitizeDetails(details) {
   const next = {};
@@ -49,7 +63,6 @@ function emptyEditableProduct() {
   return {
     name: "",
     barcode: "",
-    labelNumber: "",
     category: "Genel",
     quantity: 1,
     price: 0,
@@ -116,10 +129,9 @@ export default function InventoryScreen({ t }) {
     return products.filter((p) => {
       const name = normalizeForSearch(p.name);
       const barcode = normalizeForSearch(p.barcode);
-      const labelNumber = normalizeForSearch(p.labelNumber);
       const productCode = normalizeForSearch(p.details?.productCode || p.productCode || p.details?.productcode);
 
-      return name.includes(q) || barcode.includes(q) || labelNumber.includes(q) || productCode.includes(q);
+      return name.includes(q) || barcode.includes(q) || productCode.includes(q);
     });
   }, [products, search]);
 
@@ -142,7 +154,6 @@ export default function InventoryScreen({ t }) {
       id: product.id,
       name: product.name || "",
       barcode: product.barcode || "",
-      labelNumber: product.labelNumber || "",
       category: product.category || "",
       quantity: Number(product.quantity || 0),
       price: Number(product.price || 0),
@@ -195,9 +206,8 @@ export default function InventoryScreen({ t }) {
 
     const matchedProduct = products.find((product) => {
       const barcode = String(product.barcode || "").trim().toLowerCase();
-      const labelNumber = String(product.labelNumber || "").trim().toLowerCase();
       const query = normalized.toLowerCase();
-      return barcode === query || labelNumber === query;
+      return barcode === query;
     });
 
     if (matchedProduct?.id) {
@@ -243,7 +253,12 @@ export default function InventoryScreen({ t }) {
         {
           fps: 16,
           qrbox: { width: 280, height: 170 },
-          aspectRatio: 1.7778
+          aspectRatio: 1.7778,
+          formatsToSupport: SUPPORTED_SCAN_FORMATS,
+          disableFlip: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
         },
         async (decodedText) => {
           applyScannedSearch(decodedText);
@@ -447,7 +462,18 @@ export default function InventoryScreen({ t }) {
       const normalizedQuantity = Math.max(0, Number(editing.quantity || 0));
 
       const normalizedBarcode = String(editing.barcode || "").trim();
-      const normalizedLabelNumber = String(editing.labelNumber || "").trim();
+
+      if (!editing.id && normalizedBarcode) {
+        const existingByBarcode = products.find((product) => (
+          String(product.barcode || "").trim().toLowerCase() === normalizedBarcode.toLowerCase()
+        ));
+
+        if (existingByBarcode) {
+          openEdit(existingByBarcode);
+          setMessage(t.productFound);
+          return;
+        }
+      }
 
       if (!editing.id && !detailsName) {
         setError(t.productCodeAndQuantityRequired);
@@ -455,7 +481,7 @@ export default function InventoryScreen({ t }) {
       }
 
       if (refImageFile) {
-        const uploadKey = String(editing.id || normalizedBarcode || normalizedLabelNumber || editing.name || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "_");
+        const uploadKey = String(editing.id || normalizedBarcode || editing.name || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "_");
         const uploadedRefUrl = await uploadProductRefImage(refImageFile, uploadKey);
         nextDetails.imageRef = uploadedRefUrl;
       }
@@ -466,7 +492,6 @@ export default function InventoryScreen({ t }) {
           ? String(editing.name || "").trim()
           : manualName || detailsName,
         barcode: normalizedBarcode,
-        labelNumber: normalizedLabelNumber,
         category: editing.id ? String(editing.category || "Genel").trim() || "Genel" : "Genel",
         quantity: editing.id ? normalizedQuantity : 1,
         price: editing.id ? Math.max(0, Number(editing.price || 0)) : 0,
@@ -579,7 +604,6 @@ export default function InventoryScreen({ t }) {
 
           const basePairs = [
             { key: t.barcode, value: p.barcode || "-" },
-            { key: t.labelNumber, value: p.labelNumber || "-" },
             { key: t.price, value: Number(p.price || 0).toFixed(2) },
             { key: t.quantityLabel, value: String(qty) }
           ];
@@ -793,18 +817,6 @@ export default function InventoryScreen({ t }) {
                     className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                   />
                 </label>
-                <label className="space-y-1">
-                  <span className="text-[11px] text-slate-400">
-                    {t.labelNumber}
-                    {isCreating ? ` (${t.optionalFields})` : ""}
-                  </span>
-                  <input
-                    value={editing.labelNumber ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, labelNumber: e.target.value }))}
-                    placeholder={t.labelNumber}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                  />
-                </label>
                 <button
                   type="button"
                   disabled={busy || !!scannerTarget || isStartingScan}
@@ -812,14 +824,6 @@ export default function InventoryScreen({ t }) {
                   className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-200 disabled:opacity-50"
                 >
                   {t.scanBarcode}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || !!scannerTarget || isStartingScan}
-                  onClick={() => onStartScanFor("labelNumber")}
-                  className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-200 disabled:opacity-50"
-                >
-                  {t.scanLabel}
                 </button>
               </div>
 

@@ -18,7 +18,6 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'name',
           'barcode',
-          'labelNumber',
           'category',
           'quantity',
           'price',
@@ -28,7 +27,6 @@ service cloud.firestore {
         ])
         && isNonEmptyString(data.name, 120)
         && isString(data.barcode, 80)
-        && (!data.keys().hasAny(['labelNumber']) || isString(data.labelNumber, 80))
         && isNonEmptyString(data.category, 80)
         && data.quantity is number
         && data.quantity >= 0

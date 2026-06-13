@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { applyStockChange, createProduct, findProductByBarcode, findProductByLabelNumber, uploadProductRefImage } from "../services/stockService";
+import { applyStockChange, createProduct, findProductByBarcode, uploadProductRefImage } from "../services/stockService";
 
 const SUPPORTED_SCAN_FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
@@ -60,7 +60,6 @@ function emptyProduct() {
   return {
     name: "",
     barcode: "",
-    labelNumber: "",
     quantity: 1,
     details: {
       productCode: "",
@@ -143,7 +142,6 @@ export default function ScannerScreen({ t }) {
   const startLockRef = useRef(false);
   const [, setIsStarting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [scanMode, setScanMode] = useState("barcode");
   const [manualMode, setManualMode] = useState(false);
   const [scannedCode, setScannedCode] = useState("");
   const [product, setProduct] = useState(null);
@@ -263,7 +261,7 @@ export default function ScannerScreen({ t }) {
           playBeep();
 
           try {
-            const found = await findProductByBarcode(normalized) || await findProductByLabelNumber(normalized);
+            const found = await findProductByBarcode(normalized);
 
             setProduct(found);
 
@@ -271,8 +269,7 @@ export default function ScannerScreen({ t }) {
               setManualMode(true);
               setNewProduct((prev) => ({
                 ...prev,
-                barcode: scanMode === "barcode" ? normalized : prev.barcode,
-                labelNumber: scanMode === "label" ? normalized : prev.labelNumber
+                barcode: normalized
               }));
             } else {
               setManualMode(false);
@@ -301,7 +298,7 @@ export default function ScannerScreen({ t }) {
       setIsStarting(false);
       startLockRef.current = false;
     }
-  }, [loadCameras, manualMode, scanMode, selectedCameraId, stopScan, t]);
+  }, [loadCameras, manualMode, selectedCameraId, stopScan, t]);
 
   useEffect(() => {
     loadCameras().catch(() => {});
@@ -333,10 +330,8 @@ export default function ScannerScreen({ t }) {
     await startScan();
   };
 
-  const onSwitchScanMode = async (mode) => {
-    if (mode === scanMode) return;
+  const onSwitchScanMode = async () => {
     await stopScan();
-    setScanMode(mode);
     setScannedCode("");
     setManualMode(false);
     setProduct(null);
@@ -372,8 +367,8 @@ export default function ScannerScreen({ t }) {
     setRefImageFile(null);
   };
 
-  const onScanIdentifierFromManual = async (mode) => {
-    await onSwitchScanMode(mode);
+  const onScanIdentifierFromManual = async () => {
+    await onSwitchScanMode();
     await startScan();
   };
 
@@ -413,13 +408,7 @@ export default function ScannerScreen({ t }) {
     event.preventDefault();
     if (isSaving) return;
 
-    const resolvedBarcode = scanMode === "barcode"
-      ? String(scannedCode || newProduct.barcode || "").trim()
-      : String(newProduct.barcode || "").trim();
-
-    const resolvedLabel = scanMode === "label"
-      ? String(scannedCode || newProduct.labelNumber || "").trim()
-      : String(newProduct.labelNumber || "").trim();
+    const resolvedBarcode = String(scannedCode || newProduct.barcode || "").trim();
 
     const detailsName = String(newProduct.details?.productCode || "").trim();
     const manualName = String(newProduct.name || "").trim();
@@ -437,7 +426,7 @@ export default function ScannerScreen({ t }) {
     setIsSaving(true);
 
     try {
-      const storageKey = String(resolvedBarcode || resolvedLabel || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "_");
+      const storageKey = String(resolvedBarcode || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "_");
       const preparedDetails = sanitizeDetails(newProduct.details);
 
       if (refImageFile) {
@@ -451,7 +440,6 @@ export default function ScannerScreen({ t }) {
 
       const created = await createProduct({
         barcode: resolvedBarcode,
-        labelNumber: resolvedLabel,
         name: resolvedName,
         category: "Genel",
         price: 0,
@@ -462,7 +450,6 @@ export default function ScannerScreen({ t }) {
       setProduct({
         id: created.id,
         barcode: resolvedBarcode,
-        labelNumber: resolvedLabel,
         name: resolvedName,
         category: "Genel",
         price: 0,
@@ -471,7 +458,7 @@ export default function ScannerScreen({ t }) {
       });
 
       setManualMode(false);
-      setScannedCode(resolvedBarcode || resolvedLabel || detailsName);
+      setScannedCode(resolvedBarcode || detailsName);
       setRefImageFile(null);
       setMessage(created.existed ? t.productMerged : t.actionDone);
     } catch (saveError) {
@@ -563,7 +550,6 @@ export default function ScannerScreen({ t }) {
           <p className="text-sm text-cyan-300">{t.productFound}</p>
           <h3 className="mt-1 text-2xl font-bold">{product.name}</h3>
           <p className="mt-1 text-sm text-slate-400">{t.barcode}: {product.barcode}</p>
-          <p className="mt-1 text-sm text-slate-400">{t.labelNumber}: {product.labelNumber || "-"}</p>
           <p className="mt-3 text-lg">
             {t.currentStock}: <span className="font-extrabold text-cyan-300">{product.quantity}</span>
           </p>
@@ -630,28 +616,12 @@ export default function ScannerScreen({ t }) {
                   className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                 />
               </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.labelNumber} ({t.optionalFields})</span>
-                <input
-                  value={newProduct.labelNumber || ""}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, labelNumber: e.target.value }))}
-                  placeholder={t.labelNumber}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
-              </label>
               <button
                 type="button"
-                onClick={() => onScanIdentifierFromManual("barcode")}
+                onClick={() => onScanIdentifierFromManual()}
                 className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-200"
               >
                 {t.scanBarcode}
-              </button>
-              <button
-                type="button"
-                onClick={() => onScanIdentifierFromManual("label")}
-                className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-200"
-              >
-                {t.scanLabel}
               </button>
             </div>
           </div>
