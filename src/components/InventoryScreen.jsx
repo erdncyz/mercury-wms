@@ -95,6 +95,14 @@ export default function InventoryScreen({ t }) {
   const [searchScanError, setSearchScanError] = useState("");
   const isAnyOverlayOpen = Boolean(editing || pendingDelete || pendingBulkDelete);
 
+  const onPasteRefImage = useCallback((event) => {
+    const pastedFile = getImageFileFromClipboardEvent(event);
+    if (!pastedFile) return;
+    event.preventDefault();
+    setRefImageFile(pastedFile);
+    setError("");
+  }, []);
+
   useEffect(() => {
     const unsub = subscribeProducts((rows) => setProducts(rows));
     return () => unsub();
@@ -709,7 +717,7 @@ export default function InventoryScreen({ t }) {
             }
           }}
         >
-          <form onSubmit={onSaveEdit} className="glass relative mx-auto w-full max-w-lg rounded-3xl p-3 space-y-3 sm:p-4">
+          <form onSubmit={onSaveEdit} onPasteCapture={onPasteRefImage} className="glass relative mx-auto w-full max-w-lg rounded-3xl p-3 space-y-3 sm:p-4">
             <button
               type="button"
               onClick={() => closeEditModal()}

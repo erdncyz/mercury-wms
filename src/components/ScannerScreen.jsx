@@ -157,6 +157,14 @@ export default function ScannerScreen({ t }) {
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [isLoadingCameras, setIsLoadingCameras] = useState(false);
 
+  const onPasteRefImage = useCallback((event) => {
+    const pastedFile = getImageFileFromClipboardEvent(event);
+    if (!pastedFile) return;
+    event.preventDefault();
+    setRefImageFile(pastedFile);
+    setError("");
+  }, []);
+
   const stopScan = useCallback(async () => {
     try {
       if (scanner.current?.isScanning) {
@@ -591,7 +599,7 @@ export default function ScannerScreen({ t }) {
       ) : null}
 
       {(manualMode || (scannedCode && !product)) ? (
-        <form onSubmit={onCreateProduct} className="glass space-y-3 rounded-3xl p-4">
+        <form onSubmit={onCreateProduct} onPasteCapture={onPasteRefImage} className="glass space-y-3 rounded-3xl p-4">
           <p className="text-sm text-amber-300">{scannedCode ? t.productNotFound : t.manualAddHint}</p>
           <p className="text-xs text-cyan-200">{t.requiredManualFields}</p>
 
