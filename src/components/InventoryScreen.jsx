@@ -563,7 +563,6 @@ export default function InventoryScreen({ t }) {
           const basePairs = [
             { key: t.barcode, value: p.barcode || "-" },
             { key: t.labelNumber, value: p.labelNumber || "-" },
-            { key: t.category, value: p.category || "-" },
             { key: t.price, value: Number(p.price || 0).toFixed(2) },
             { key: t.quantityLabel, value: String(qty) }
           ];
@@ -604,6 +603,11 @@ export default function InventoryScreen({ t }) {
                         {t.warehouseLocation}: {details.warehouseLocation}
                       </p>
                     ) : null}
+                    {details.totalProductCount !== undefined && details.totalProductCount !== null && String(details.totalProductCount).trim() !== "" ? (
+                      <p className="mt-1 text-sm text-slate-400">
+                        {t.totalProductCount}: {details.totalProductCount}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -625,17 +629,30 @@ export default function InventoryScreen({ t }) {
                           <span className="text-slate-500">{item.key}:</span> {item.value}
                         </p>
                       ))}
-                      {optionalPairs.map((item) => (
-                        <p key={item.key} className="text-slate-300">
-                          <span className="text-slate-500">{item.key}:</span> {String(item.value)}
-                        </p>
-                      ))}
                     </div>
 
-                    {hasFeatures ? (
-                      <p className="mt-2 text-xs text-slate-300">
-                        <span className="text-slate-500">{t.features}:</span> {details.features}
-                      </p>
+                    {optionalPairs.length > 0 || hasFeatures ? (
+                      <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-cyan-200">
+                          {t.optionalDetailsTitle}
+                        </p>
+
+                        {optionalPairs.length > 0 ? (
+                          <div className="grid gap-x-3 gap-y-1 text-xs md:grid-cols-2">
+                            {optionalPairs.map((item) => (
+                              <p key={item.key} className="text-slate-300">
+                                <span className="text-slate-500">{item.key}:</span> {String(item.value)}
+                              </p>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {hasFeatures ? (
+                          <p className="mt-2 text-xs text-slate-300">
+                            <span className="text-slate-500">{t.features}:</span> {details.features}
+                          </p>
+                        ) : null}
+                      </div>
                     ) : null}
                   </>
                 ) : null}
@@ -724,26 +741,6 @@ export default function InventoryScreen({ t }) {
                       value={editing.name ?? ""}
                       onChange={(e) => setEditing((prev) => ({ ...prev, name: e.target.value }))}
                       placeholder={t.productName}
-                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[11px] text-slate-400">{t.category}</span>
-                    <input
-                      value={editing.category ?? ""}
-                      onChange={(e) => setEditing((prev) => ({ ...prev, category: e.target.value }))}
-                      placeholder={t.category}
-                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[11px] text-slate-400">{t.quantityLabel}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={editing.quantity ?? 0}
-                      onChange={(e) => setEditing((prev) => ({ ...prev, quantity: e.target.value }))}
-                      placeholder={t.quantityLabel}
                       className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                     />
                   </label>
