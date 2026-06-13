@@ -102,7 +102,8 @@ export default function InventoryScreen({ t }) {
       const name = String(p.name || "").toLowerCase();
       const barcode = String(p.barcode || "").toLowerCase();
       const labelNumber = String(p.labelNumber || "").toLowerCase();
-      return name.includes(q) || barcode.includes(q) || labelNumber.includes(q);
+      const productCode = String(p.details?.productCode || "").toLowerCase();
+      return name.includes(q) || barcode.includes(q) || labelNumber.includes(q) || productCode.includes(q);
     });
   }, [products, search]);
 
