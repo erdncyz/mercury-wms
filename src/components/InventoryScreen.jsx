@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
 import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, updateProduct, uploadProductRefImage } from "../services/stockService";
@@ -776,150 +776,177 @@ export default function InventoryScreen({ t }) {
           <div className="glass rounded-2xl px-4 py-4 text-sm text-slate-300">
             {products.length === 0 ? t.emptyState : search.trim() ? t.productNotFound : t.emptyState}
           </div>
-        ) : null}
+        ) : (
+          <div className="glass overflow-x-auto rounded-3xl sm:rounded-2xl">
+            <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                  {bulkMode ? <th className="px-3 py-3 w-10" /> : null}
+                  <th className="px-3 py-3">{t.columnProduct}</th>
+                  <th className="px-3 py-3">{t.warehouseLocation}</th>
+                  <th className="px-3 py-3 whitespace-nowrap">{t.columnStock}</th>
+                  <th className="px-3 py-3 text-center w-20">{t.columnDetails}</th>
+                  {!bulkMode ? <th className="px-3 py-3 text-right w-44">{t.columnActions}</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => {
+                  const cardImage = String(p.details?.imageRef || p.imageUrl || "").trim();
+                  const details = p.details || {};
+                  const isExpanded = expandedIds.includes(p.id);
+                  const hasStockCount = details.totalProductCount !== undefined && details.totalProductCount !== null && String(details.totalProductCount).trim() !== "";
+                  const stockCount = Number(details.totalProductCount);
+                  const isLowStock = hasStockCount && Number.isFinite(stockCount) && stockCount <= 15;
 
-        {filtered.map((p) => {
-          const cardImage = String(p.details?.imageRef || p.imageUrl || "").trim();
-          const details = p.details || {};
-          const isExpanded = expandedIds.includes(p.id);
-          const hasStockCount = details.totalProductCount !== undefined && details.totalProductCount !== null && String(details.totalProductCount).trim() !== "";
-          const stockCount = Number(details.totalProductCount);
-          const isLowStock = hasStockCount && Number.isFinite(stockCount) && stockCount <= 15;
+                  const basePairs = [
+                    { key: t.barcode, value: p.barcode || "-" },
+                    { key: t.price, value: Number(p.price || 0).toFixed(2) }
+                  ];
 
-          const basePairs = [
-            { key: t.barcode, value: p.barcode || "-" },
-            { key: t.price, value: Number(p.price || 0).toFixed(2) }
-          ];
+                  const optionalPairs = [
+                    { key: t.productCode, value: details.productCode },
+                    { key: t.containerNumber, value: details.containerNumber },
+                    { key: t.warehouseLocation, value: details.warehouseLocation },
+                    { key: t.totalProductCount, value: details.totalProductCount },
+                    { key: t.unitKg, value: details.unitKg },
+                    { key: t.totalKg, value: details.totalKg },
+                    { key: t.widthCm, value: details.widthCm },
+                    { key: t.lengthCm, value: details.lengthCm },
+                    { key: t.heightCm, value: details.heightCm },
+                    { key: t.unitM3, value: details.unitM3 },
+                    { key: t.totalM3, value: details.totalM3 }
+                  ];
 
-          const optionalPairs = [
-            { key: t.productCode, value: details.productCode },
-            { key: t.containerNumber, value: details.containerNumber },
-            { key: t.warehouseLocation, value: details.warehouseLocation },
-            { key: t.totalProductCount, value: details.totalProductCount },
-            { key: t.unitKg, value: details.unitKg },
-            { key: t.totalKg, value: details.totalKg },
-            { key: t.widthCm, value: details.widthCm },
-            { key: t.lengthCm, value: details.lengthCm },
-            { key: t.heightCm, value: details.heightCm },
-            { key: t.unitM3, value: details.unitM3 },
-            { key: t.totalM3, value: details.totalM3 }
-          ];
+                  const hasFeatures = typeof details.features === "string" && details.features.trim().length > 0;
+                  const colSpan = (bulkMode ? 1 : 0) + 4 + (bulkMode ? 0 : 1);
 
-          const hasFeatures = typeof details.features === "string" && details.features.trim().length > 0;
-
-          return (
-            <article key={p.id} className="glass rounded-3xl p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:rounded-2xl sm:p-3">
-              <div className="flex min-w-0 items-start gap-2">
-                <div className="flex min-w-0 items-start gap-3">
-                  {cardImage ? (
-                    <img src={cardImage} alt={p.name} className="h-16 w-16 rounded-lg object-cover border border-white/10 shrink-0 sm:h-20 sm:w-20" />
-                  ) : (
-                    <div className="h-16 w-16 rounded-lg border border-white/10 bg-slate-900/40 sm:h-20 sm:w-20" />
-                  )}
-
-                  <div className="min-w-0">
-                    <h3 className="text-[1.22rem] font-semibold leading-snug text-slate-100 sm:text-xl sm:font-bold">
-                      {p.name}
-                      {details.productCode ? ` - ${details.productCode}` : ""}
-                    </h3>
-                    {details.warehouseLocation ? (
-                      <p className="mt-1 text-sm text-slate-400">
-                        {t.warehouseLocation}: {details.warehouseLocation}
-                      </p>
-                    ) : null}
-                    {details.totalProductCount !== undefined && details.totalProductCount !== null && String(details.totalProductCount).trim() !== "" ? (
-                      <p className={`mt-1 text-sm ${isLowStock ? "font-semibold text-rose-400" : "text-slate-400"}`}>
-                        {t.totalProductCount}: {details.totalProductCount}
-                        {isLowStock ? (
-                          <span className="ml-2 inline-flex items-center rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[11px] font-bold text-rose-300">
-                            {t.lowStock}
-                          </span>
+                  return (
+                    <Fragment key={p.id}>
+                      <tr className="border-b border-white/5 align-middle hover:bg-white/[0.03]">
+                        {bulkMode ? (
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(p.id)}
+                              onChange={() => onToggleSelected(p.id)}
+                              className="h-4 w-4 accent-cyan-300"
+                            />
+                          </td>
                         ) : null}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
 
-              <div className="mt-3 rounded-xl border border-white/10 bg-slate-900/30 p-2.5 sm:mt-2.5 sm:p-2">
-                <button
-                  type="button"
-                  onClick={() => onToggleExpanded(p.id)}
-                  className="w-full rounded-xl border border-cyan-300/20 bg-slate-950/50 px-3 py-2 text-left text-sm font-bold tracking-[0.01em] text-cyan-200 sm:rounded-lg sm:py-1.5 sm:text-[11px] sm:font-semibold sm:uppercase sm:tracking-[0.09em]"
-                >
-                  {isExpanded ? t.hideDetails : t.showDetails}
-                </button>
-
-                {isExpanded ? (
-                  <>
-                    <div className="mt-2 grid gap-x-3 gap-y-1 text-xs md:grid-cols-2">
-                      {basePairs.map((item) => (
-                        <p key={item.key} className="text-slate-300">
-                          <span className="text-slate-500">{item.key}:</span> {item.value}
-                        </p>
-                      ))}
-                    </div>
-
-                    {optionalPairs.length > 0 || hasFeatures ? (
-                      <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/35 p-3">
-                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-cyan-200">
-                          {t.optionalDetailsTitle}
-                        </p>
-
-                        {optionalPairs.length > 0 ? (
-                          <div className="grid gap-x-3 gap-y-1 text-xs md:grid-cols-2">
-                            {optionalPairs.map((item) => (
-                              <p key={item.key} className="text-slate-300">
-                                <span className="text-slate-500">{item.key}:</span> {item.value !== undefined && item.value !== null && String(item.value).trim() !== "" ? String(item.value) : "-"}
-                              </p>
-                            ))}
+                        <td className="px-3 py-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            {cardImage ? (
+                              <img src={cardImage} alt={p.name} className="h-12 w-12 shrink-0 rounded-lg border border-white/10 object-cover" />
+                            ) : (
+                              <div className="h-12 w-12 shrink-0 rounded-lg border border-white/10 bg-slate-900/40" />
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-100">{p.name}</p>
+                              {details.productCode ? (
+                                <p className="truncate text-xs text-slate-500">{details.productCode}</p>
+                              ) : null}
+                            </div>
                           </div>
+                        </td>
+
+                        <td className="px-3 py-3 text-slate-300">
+                          {details.warehouseLocation || "-"}
+                        </td>
+
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          {hasStockCount ? (
+                            <span className="inline-flex items-center gap-2">
+                              <span className={isLowStock ? "font-bold text-rose-400" : "text-slate-200"}>
+                                {details.totalProductCount}
+                              </span>
+                              {isLowStock ? (
+                                <span className="inline-flex items-center rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[10px] font-bold text-rose-300">
+                                  {t.lowStock}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">-</span>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => onToggleExpanded(p.id)}
+                            className="rounded-lg border border-cyan-300/20 bg-slate-950/50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-cyan-200"
+                          >
+                            {isExpanded ? t.hideDetails : t.showDetails}
+                          </button>
+                        </td>
+
+                        {!bulkMode ? (
+                          <td className="px-3 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEdit(p)}
+                                className="rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-3 py-1.5 text-sm font-semibold text-cyan-200"
+                              >
+                                {t.editProduct}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPendingDelete(p)}
+                                className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-3 py-1.5 text-sm font-semibold text-rose-300"
+                              >
+                                {t.deleteProduct}
+                              </button>
+                            </div>
+                          </td>
                         ) : null}
+                      </tr>
 
-                        {hasFeatures ? (
-                          <p className="mt-2 text-xs text-slate-300">
-                            <span className="text-slate-500">{t.features}:</span> {details.features}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </>
-                ) : null}
-              </div>
+                      {isExpanded ? (
+                        <tr className="border-b border-white/5 bg-slate-950/30">
+                          <td colSpan={colSpan} className="px-3 py-3">
+                            <div className="grid gap-x-3 gap-y-1 text-xs md:grid-cols-2">
+                              {basePairs.map((item) => (
+                                <p key={item.key} className="text-slate-300">
+                                  <span className="text-slate-500">{item.key}:</span> {item.value}
+                                </p>
+                              ))}
+                            </div>
 
-              {bulkMode ? (
-                <label className="mt-2.5 flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900/30 px-2.5 py-1.5 text-xs text-slate-200">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(p.id)}
-                    onChange={() => onToggleSelected(p.id)}
-                    className="h-4 w-4 accent-cyan-300"
-                  />
-                  {t.selectForBulkDelete}
-                </label>
-              ) : null}
+                            {optionalPairs.length > 0 || hasFeatures ? (
+                              <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-cyan-200">
+                                  {t.optionalDetailsTitle}
+                                </p>
 
-              {!bulkMode ? (
-                <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-2.5 sm:gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(p)}
-                    className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2.5 text-base font-semibold text-cyan-200 sm:rounded-lg sm:py-1.5 sm:text-sm"
-                  >
-                    {t.editProduct}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingDelete(p)}
-                    className="rounded-xl border border-rose-300/35 bg-rose-500/10 px-3 py-2.5 text-base font-semibold text-rose-300 sm:rounded-lg sm:py-1.5 sm:text-sm"
-                  >
-                    {t.deleteProduct}
-                  </button>
-                </div>
-              ) : null}
-            </article>
-          );
-        })}
+                                {optionalPairs.length > 0 ? (
+                                  <div className="grid gap-x-3 gap-y-1 text-xs md:grid-cols-2">
+                                    {optionalPairs.map((item) => (
+                                      <p key={item.key} className="text-slate-300">
+                                        <span className="text-slate-500">{item.key}:</span> {item.value !== undefined && item.value !== null && String(item.value).trim() !== "" ? String(item.value) : "-"}
+                                      </p>
+                                    ))}
+                                  </div>
+                                ) : null}
+
+                                {hasFeatures ? (
+                                  <p className="mt-2 text-xs text-slate-300">
+                                    <span className="text-slate-500">{t.features}:</span> {details.features}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {editing ? (

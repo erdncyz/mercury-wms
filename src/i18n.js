@@ -135,7 +135,11 @@ export const labels = {
     bulkDeleteConfirm: "{count} urunu silmek istiyor musun?",
     bulkDeleteSuccess: "{count} urun silindi.",
     showDetails: "Detaylari Goster",
-    hideDetails: "Detaylari Gizle"
+    hideDetails: "Detaylari Gizle",
+    columnProduct: "Urun",
+    columnStock: "Stok",
+    columnActions: "Islemler",
+    columnDetails: "Detay"
   },
   en: {
     appName: "Mercury WMS",
@@ -273,6 +277,10 @@ export const labels = {
     bulkDeleteConfirm: "Do you want to delete {count} products?",
     bulkDeleteSuccess: "{count} products deleted.",
     showDetails: "Show Details",
-    hideDetails: "Hide Details"
+    hideDetails: "Hide Details",
+    columnProduct: "Product",
+    columnStock: "Stock",
+    columnActions: "Actions",
+    columnDetails: "Details"
   }
 };
