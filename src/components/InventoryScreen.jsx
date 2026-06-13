@@ -109,14 +109,16 @@ export default function InventoryScreen({ t }) {
   }, []);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const normalizeForSearch = (value) => String(value || "").toLowerCase().replace(/\s+/g, "").replace(/[-_]/g, "");
+    const q = normalizeForSearch(search.trim());
     if (!q) return products;
 
     return products.filter((p) => {
-      const name = String(p.name || "").toLowerCase();
-      const barcode = String(p.barcode || "").toLowerCase();
-      const labelNumber = String(p.labelNumber || "").toLowerCase();
-      const productCode = String(p.details?.productCode || "").toLowerCase();
+      const name = normalizeForSearch(p.name);
+      const barcode = normalizeForSearch(p.barcode);
+      const labelNumber = normalizeForSearch(p.labelNumber);
+      const productCode = normalizeForSearch(p.details?.productCode || p.productCode || p.details?.productcode);
+
       return name.includes(q) || barcode.includes(q) || labelNumber.includes(q) || productCode.includes(q);
     });
   }, [products, search]);
