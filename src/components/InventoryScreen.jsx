@@ -3,7 +3,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
 import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, updateProduct, uploadProductRefImage } from "../services/stockService";
 
-const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "features", "imageRef"];
+const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "warehouseLocation", "features", "imageRef"];
 const OPTIONAL_NUMERIC_FIELDS = ["totalProductCount", "unitKg", "totalKg", "widthCm", "lengthCm", "heightCm", "unitM3", "totalM3"];
 
 function sanitizeDetails(details) {
@@ -426,6 +426,7 @@ export default function InventoryScreen({ t }) {
     try {
       const nextDetails = { ...(editing.details || {}) };
       const detailsName = String(nextDetails.productCode || "").trim();
+      const manualName = String(editing.name || "").trim();
       const normalizedQuantity = Math.max(0, Number(editing.quantity || 0));
 
       const normalizedBarcode = String(editing.barcode || "").trim();
@@ -446,7 +447,7 @@ export default function InventoryScreen({ t }) {
         ...editing,
         name: editing.id
           ? String(editing.name || "").trim()
-          : detailsName,
+          : manualName || detailsName,
         barcode: normalizedBarcode,
         labelNumber: normalizedLabelNumber,
         category: editing.id ? String(editing.category || "Genel").trim() || "Genel" : "Genel",
@@ -570,6 +571,7 @@ export default function InventoryScreen({ t }) {
           const optionalPairs = [
             { key: t.productCode, value: details.productCode },
             { key: t.containerNumber, value: details.containerNumber },
+            { key: t.warehouseLocation, value: details.warehouseLocation },
             { key: t.totalProductCount, value: details.totalProductCount },
             { key: t.unitKg, value: details.unitKg },
             { key: t.totalKg, value: details.totalKg },
@@ -688,6 +690,33 @@ export default function InventoryScreen({ t }) {
 
             {isCreating ? <p className="text-sm text-amber-300">{t.manualAddHint}</p> : null}
             {isCreating ? <p className="text-xs text-cyan-200">{t.requiredManualFields}</p> : null}
+
+            {isCreating ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.manualProductName}</span>
+                    <input
+                      value={editing.name ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder={t.manualProductName}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.quantityLabel} *</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editing.quantity ?? 1}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, quantity: e.target.value }))}
+                      placeholder={t.quantityLabel}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : null}
 
             {!isCreating ? (
               <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
@@ -812,6 +841,20 @@ export default function InventoryScreen({ t }) {
                     className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                   />
                 </label>
+                {isCreating ? (
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.warehouseLocation}</span>
+                    <select
+                      value={editing.details?.warehouseLocation ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), warehouseLocation: e.target.value } }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                    >
+                      <option value="">{t.selectWarehouse}</option>
+                      <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
+                      <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
+                    </select>
+                  </label>
+                ) : null}
                 {!isCreating ? (
                   <label className="space-y-1">
                     <span className="text-[11px] text-slate-400">{t.containerNumber}</span>

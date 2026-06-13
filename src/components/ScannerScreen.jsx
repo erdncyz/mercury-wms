@@ -58,12 +58,14 @@ function playBeep() {
 
 function emptyProduct() {
   return {
+    name: "",
     barcode: "",
     labelNumber: "",
     quantity: 1,
     details: {
       productCode: "",
       containerNumber: "",
+      warehouseLocation: "",
       totalProductCount: "",
       unitKg: "",
       totalKg: "",
@@ -88,6 +90,7 @@ function sanitizeDetails(details) {
   const next = {
     productCode: String(details?.productCode || "").trim(),
     containerNumber: String(details?.containerNumber || "").trim(),
+    warehouseLocation: String(details?.warehouseLocation || "").trim(),
     imageRef: String(details?.imageRef || "").trim(),
     features: String(details?.features || "").trim(),
     totalProductCount: toNumberOrNull(details?.totalProductCount),
@@ -405,6 +408,7 @@ export default function ScannerScreen({ t }) {
       : String(newProduct.labelNumber || "").trim();
 
     const detailsName = String(newProduct.details?.productCode || "").trim();
+    const manualName = String(newProduct.name || "").trim();
     const parsedQuantity = Number(newProduct.quantity);
     const resolvedQuantity = Number.isFinite(parsedQuantity) ? parsedQuantity : NaN;
 
@@ -413,7 +417,7 @@ export default function ScannerScreen({ t }) {
       return;
     }
 
-    const resolvedName = detailsName;
+    const resolvedName = manualName || detailsName;
 
     setError("");
     setMessage("");
@@ -586,6 +590,31 @@ export default function ScannerScreen({ t }) {
           <p className="text-sm text-amber-300">{scannedCode ? t.productNotFound : t.manualAddHint}</p>
           <p className="text-xs text-cyan-200">{t.requiredManualFields}</p>
 
+          <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1">
+                <span className="text-[11px] text-slate-400">{t.manualProductName}</span>
+                <input
+                  value={newProduct.name || ""}
+                  onChange={(e) => setNewProduct((s) => ({ ...s, name: e.target.value }))}
+                  placeholder={t.manualProductName}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[11px] text-slate-400">{t.quantityLabel} *</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={newProduct.quantity ?? 1}
+                  onChange={(e) => setNewProduct((s) => ({ ...s, quantity: e.target.value }))}
+                  placeholder={t.quantityLabel}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                />
+              </label>
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
             <p className="text-xs font-semibold text-slate-300">{t.optionalIdentifiersTitle}</p>
 
@@ -639,15 +668,16 @@ export default function ScannerScreen({ t }) {
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-400">{t.quantityLabel} *</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={newProduct.quantity ?? 1}
-                  onChange={(e) => setNewProduct((s) => ({ ...s, quantity: e.target.value }))}
-                  placeholder={t.quantityLabel}
+                <span className="text-[11px] text-slate-400">{t.warehouseLocation}</span>
+                <select
+                  value={newProduct.details?.warehouseLocation || ""}
+                  onChange={(e) => setNewProduct((s) => ({ ...s, details: { ...(s.details || {}), warehouseLocation: e.target.value } }))}
                   className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                />
+                >
+                  <option value="">{t.selectWarehouse}</option>
+                  <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
+                  <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
+                </select>
               </label>
               <label className="space-y-1">
                 <span className="text-[11px] text-slate-400">{t.totalProductCount}</span>
