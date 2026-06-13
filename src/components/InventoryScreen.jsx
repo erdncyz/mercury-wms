@@ -599,6 +599,11 @@ export default function InventoryScreen({ t }) {
                       {p.name}
                       {details.productCode ? ` - ${details.productCode}` : ""}
                     </h3>
+                    {details.warehouseLocation ? (
+                      <p className="mt-1 text-sm text-slate-400">
+                        {t.warehouseLocation}: {details.warehouseLocation}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
