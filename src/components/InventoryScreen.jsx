@@ -122,6 +122,7 @@ export default function InventoryScreen({ t }) {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [warehouseFilter, setWarehouseFilter] = useState("");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
   const [expandedIds, setExpandedIds] = useState([]);
   const [editing, setEditing] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -168,6 +169,15 @@ export default function InventoryScreen({ t }) {
         return false;
       }
 
+      if (lowStockOnly) {
+        const raw = p.details?.totalProductCount;
+        const hasStockCount = raw !== undefined && raw !== null && String(raw).trim() !== "";
+        const stockCount = Number(raw);
+        if (!hasStockCount || !Number.isFinite(stockCount) || stockCount > 15) {
+          return false;
+        }
+      }
+
       if (!q) return true;
 
       const name = normalizeForSearch(p.name);
@@ -176,7 +186,7 @@ export default function InventoryScreen({ t }) {
 
       return name.includes(q) || barcode.includes(q) || productCode.includes(q);
     });
-  }, [products, search, warehouseFilter]);
+  }, [products, search, warehouseFilter, lowStockOnly]);
 
   const isCreating = Boolean(editing && !editing.id);
 
@@ -674,6 +684,21 @@ export default function InventoryScreen({ t }) {
             <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
             <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
           </select>
+        </div>
+
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setLowStockOnly((prev) => !prev)}
+            className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-bold transition ${
+              lowStockOnly
+                ? "border-rose-400/50 bg-rose-400/15 text-rose-200"
+                : "border-white/10 bg-slate-900/60 text-slate-300"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${lowStockOnly ? "bg-rose-400" : "bg-slate-500"}`} />
+            {t.lowStock}
+          </button>
         </div>
 
         {isSearchScannerOpen ? (
