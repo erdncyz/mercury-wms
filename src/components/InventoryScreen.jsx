@@ -66,6 +66,12 @@ function mapSaveError(error, t) {
   return code ? `${t.saveError}: ${code}` : t.saveError;
 }
 
+function getImageFileFromClipboardEvent(event) {
+  const items = Array.from(event.clipboardData?.items || []);
+  const imageItem = items.find((item) => String(item.type || "").startsWith("image/"));
+  return imageItem?.getAsFile() || null;
+}
+
 export default function InventoryScreen({ t }) {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
@@ -580,7 +586,7 @@ export default function InventoryScreen({ t }) {
             { key: t.heightCm, value: details.heightCm },
             { key: t.unitM3, value: details.unitM3 },
             { key: t.totalM3, value: details.totalM3 }
-          ].filter((item) => item.value !== undefined && item.value !== null && String(item.value).trim() !== "");
+          ];
 
           const hasFeatures = typeof details.features === "string" && details.features.trim().length > 0;
 
@@ -642,7 +648,7 @@ export default function InventoryScreen({ t }) {
                           <div className="grid gap-x-3 gap-y-1 text-xs md:grid-cols-2">
                             {optionalPairs.map((item) => (
                               <p key={item.key} className="text-slate-300">
-                                <span className="text-slate-500">{item.key}:</span> {String(item.value)}
+                                <span className="text-slate-500">{item.key}:</span> {item.value !== undefined && item.value !== null && String(item.value).trim() !== "" ? String(item.value) : "-"}
                               </p>
                             ))}
                           </div>
@@ -947,14 +953,23 @@ export default function InventoryScreen({ t }) {
                     />
                   </label>
                 ) : null}
-                <label className="flex items-center rounded-xl border border-dashed border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-200 cursor-pointer">
+                <label
+                  tabIndex={0}
+                  onPaste={(event) => {
+                    const pastedFile = getImageFileFromClipboardEvent(event);
+                    if (!pastedFile) return;
+                    event.preventDefault();
+                    setRefImageFile(pastedFile);
+                  }}
+                  className="flex items-center rounded-xl border border-dashed border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-200 cursor-pointer outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/30"
+                >
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
                     onChange={(e) => setRefImageFile(e.target.files?.[0] || null)}
                   />
-                  {refImageFile ? `${t.imageRef}: ${refImageFile.name}` : t.uploadRefImage}
+                  {refImageFile ? `${t.imageRef}: ${refImageFile.name}` : t.uploadRefImageWithPaste}
                 </label>
               </div>
 
