@@ -674,7 +674,7 @@ export default function InventoryScreen({ t }) {
           </button>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           <select
             value={warehouseFilter}
             onChange={(e) => setWarehouseFilter(e.target.value)}
@@ -684,16 +684,14 @@ export default function InventoryScreen({ t }) {
             <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
             <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
           </select>
-        </div>
 
-        <div className="mt-3">
           <button
             type="button"
             onClick={() => setLowStockOnly((prev) => !prev)}
-            className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-bold transition ${
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-bold transition ${
               lowStockOnly
                 ? "border-rose-400/50 bg-rose-400/15 text-rose-200"
-                : "border-white/10 bg-slate-900/60 text-slate-300"
+                : "border-white/10 bg-slate-900/60 text-slate-300 hover:border-rose-400/30"
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${lowStockOnly ? "bg-rose-400" : "bg-slate-500"}`} />
