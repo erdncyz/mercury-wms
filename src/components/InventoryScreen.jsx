@@ -126,6 +126,7 @@ export default function InventoryScreen({ t }) {
   const [sortBy, setSortBy] = useState("nameAsc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [showSummary, setShowSummary] = useState(true);
   const [expandedIds, setExpandedIds] = useState([]);
   const [editing, setEditing] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -190,6 +191,58 @@ export default function InventoryScreen({ t }) {
       return name.includes(q) || barcode.includes(q) || productCode.includes(q);
     });
   }, [products, search, warehouseFilter, lowStockOnly]);
+
+  const summary = useMemo(() => {
+    const getStock = (p) => {
+      const value = Number(p.details?.totalProductCount);
+      return Number.isFinite(value) ? value : 0;
+    };
+
+    let totalStock = 0;
+    let totalValue = 0;
+    let lowStock = 0;
+    const warehouses = {};
+
+    products.forEach((p) => {
+      const stock = getStock(p);
+      const price = Number(p.price || 0);
+      const raw = p.details?.totalProductCount;
+      const hasStock = raw !== undefined && raw !== null && String(raw).trim() !== "";
+
+      totalStock += stock;
+      totalValue += stock * (Number.isFinite(price) ? price : 0);
+
+      if (hasStock && stock <= 15) {
+        lowStock += 1;
+      }
+
+      const warehouse = String(p.details?.warehouseLocation || "").trim() || "—";
+      warehouses[warehouse] = (warehouses[warehouse] || 0) + 1;
+    });
+
+    const warehouseDistribution = Object.entries(warehouses)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const topProducts = [...products]
+      .map((p) => {
+        const stock = getStock(p);
+        const price = Number(p.price || 0);
+        return { id: p.id, name: p.name, value: stock * (Number.isFinite(price) ? price : 0), stock };
+      })
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+
+    return {
+      totalProducts: products.length,
+      totalStock,
+      totalValue,
+      lowStock,
+      warehouseDistribution,
+      topProducts
+    };
+  }, [products]);
 
   const sorted = useMemo(() => {
     const getStock = (p) => {
@@ -723,6 +776,96 @@ export default function InventoryScreen({ t }) {
 
   return (
     <section className="space-y-4">
+      <div className="glass rounded-3xl p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-display text-lg font-bold text-slate-100">{t.dashboardTitle}</h2>
+          <button
+            type="button"
+            onClick={() => setShowSummary((prev) => !prev)}
+            className="rounded-xl border border-white/15 px-3 py-1.5 text-xs font-bold text-slate-200"
+          >
+            {showSummary ? t.hideSummary : t.showSummary}
+          </button>
+        </div>
+
+        {showSummary ? (
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">{t.summaryTotalProducts}</p>
+                <p className="mt-1 text-2xl font-extrabold text-slate-100">{summary.totalProducts.toLocaleString("tr-TR")}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">{t.summaryTotalStock}</p>
+                <p className="mt-1 text-2xl font-extrabold text-cyan-200">{summary.totalStock.toLocaleString("tr-TR")}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">{t.summaryTotalValue}</p>
+                <p className="mt-1 text-2xl font-extrabold text-emerald-300">{summary.totalValue.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">{t.summaryLowStock}</p>
+                <p className={`mt-1 text-2xl font-extrabold ${summary.lowStock > 0 ? "text-rose-400" : "text-slate-100"}`}>
+                  {summary.lowStock.toLocaleString("tr-TR")}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{t.summaryWarehouseDistribution}</p>
+                {summary.warehouseDistribution.length > 0 ? (
+                  <ul className="space-y-1.5">
+                    {summary.warehouseDistribution.map((item) => {
+                      const ratio = summary.totalProducts > 0 ? Math.round((item.count / summary.totalProducts) * 100) : 0;
+                      return (
+                        <li key={item.name} className="text-xs">
+                          <div className="flex items-center justify-between text-slate-300">
+                            <span className="truncate">{item.name}</span>
+                            <span className="shrink-0 text-slate-400">{item.count} ({ratio}%)</span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                            <div className="h-full rounded-full bg-cyan-400/70" style={{ width: `${ratio}%` }} />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-slate-500">{t.summaryNoData}</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{t.summaryTopProducts}</p>
+                  <p className="text-[10px] text-slate-500">{t.summaryTopProductsHint}</p>
+                </div>
+                {summary.topProducts.length > 0 ? (
+                  <ol className="space-y-1.5">
+                    {summary.topProducts.map((item, index) => (
+                      <li key={item.id} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-300/15 text-[10px] font-bold text-amber-300">
+                            {index + 1}
+                          </span>
+                          <span className="truncate text-slate-200">{item.name}</span>
+                        </span>
+                        <span className="shrink-0 font-semibold text-emerald-300">
+                          {item.value.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-xs text-slate-500">{t.summaryNoData}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
       <div className="glass rounded-3xl p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
           <input

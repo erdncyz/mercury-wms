@@ -153,7 +153,18 @@ export const labels = {
     previousPage: "Onceki",
     nextPage: "Sonraki",
     pageOf: "Sayfa {page} / {pages}",
-    perPage: "Sayfa basina"
+    perPage: "Sayfa basina",
+    dashboardTitle: "Ozet",
+    showSummary: "Ozeti Goster",
+    hideSummary: "Ozeti Gizle",
+    summaryTotalProducts: "Toplam Urun",
+    summaryTotalStock: "Toplam Stok Adedi",
+    summaryTotalValue: "Toplam Stok Degeri",
+    summaryLowStock: "Dusuk Stok",
+    summaryWarehouseDistribution: "Depo Bazinda Dagilim",
+    summaryTopProducts: "En Degerli Urunler",
+    summaryTopProductsHint: "Fiyat x stok adedine gore",
+    summaryNoData: "Henuz veri yok"
   },
   en: {
     appName: "Mercury WMS",
@@ -309,6 +320,17 @@ export const labels = {
     previousPage: "Previous",
     nextPage: "Next",
     pageOf: "Page {page} / {pages}",
-    perPage: "Per page"
+    perPage: "Per page",
+    dashboardTitle: "Summary",
+    showSummary: "Show Summary",
+    hideSummary: "Hide Summary",
+    summaryTotalProducts: "Total Products",
+    summaryTotalStock: "Total Stock Units",
+    summaryTotalValue: "Total Stock Value",
+    summaryLowStock: "Low Stock",
+    summaryWarehouseDistribution: "Warehouse Distribution",
+    summaryTopProducts: "Top Value Products",
+    summaryTopProductsHint: "By price x stock units",
+    summaryNoData: "No data yet"
   }
 };
