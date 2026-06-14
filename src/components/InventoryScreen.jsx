@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
+import * as XLSX from "xlsx";
 import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, updateProduct, uploadProductRefImage } from "../services/stockService";
 
 const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "warehouseLocation", "features", "imageRef"];
@@ -698,6 +699,42 @@ export default function InventoryScreen({ t }) {
     }
   };
 
+  const onExportExcel = () => {
+    const rows = sorted;
+    if (rows.length === 0) {
+      setError(t.exportNoData);
+      return;
+    }
+
+    const data = rows.map((p) => {
+      const details = p.details || {};
+      return {
+        [t.productName]: p.name || "",
+        [t.barcode]: p.barcode || "",
+        [t.productCode]: details.productCode || "",
+        [t.warehouseLocation]: details.warehouseLocation || "",
+        [t.containerNumber]: details.containerNumber || "",
+        [t.totalProductCount]: details.totalProductCount ?? "",
+        [t.price]: Number(p.price || 0),
+        [t.unitKg]: details.unitKg ?? "",
+        [t.totalKg]: details.totalKg ?? "",
+        [t.widthCm]: details.widthCm ?? "",
+        [t.lengthCm]: details.lengthCm ?? "",
+        [t.heightCm]: details.heightCm ?? "",
+        [t.unitM3]: details.unitM3 ?? "",
+        [t.totalM3]: details.totalM3 ?? "",
+        [t.features]: details.features || ""
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Stok");
+
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `mercury-wms-stok-${date}.xlsx`);
+  };
+
   const onSaveEdit = async (event) => {
     event.preventDefault();
     if (!editing) return;
@@ -973,6 +1010,15 @@ export default function InventoryScreen({ t }) {
             className="rounded-xl border border-amber-300/35 bg-amber-300/10 px-3 py-2 text-sm font-bold text-amber-200"
           >
             {bulkMode ? t.exitBulkDeleteMode : t.bulkDeleteMode}
+          </button>
+
+          <button
+            type="button"
+            onClick={onExportExcel}
+            disabled={sorted.length === 0}
+            className="rounded-xl border border-emerald-300/35 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-200 disabled:opacity-50"
+          >
+            {t.exportExcel}
           </button>
 
           {bulkMode ? (

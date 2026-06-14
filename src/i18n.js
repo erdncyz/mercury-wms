@@ -164,7 +164,9 @@ export const labels = {
     summaryWarehouseDistribution: "Depo Bazinda Dagilim",
     summaryTopProducts: "En Degerli Urunler",
     summaryTopProductsHint: "Fiyat x stok adedine gore",
-    summaryNoData: "Henuz veri yok"
+    summaryNoData: "Henuz veri yok",
+    exportExcel: "Excel'e Aktar",
+    exportNoData: "Aktarilacak urun yok"
   },
   en: {
     appName: "Mercury WMS",
@@ -331,6 +333,8 @@ export const labels = {
     summaryWarehouseDistribution: "Warehouse Distribution",
     summaryTopProducts: "Top Value Products",
     summaryTopProductsHint: "By price x stock units",
-    summaryNoData: "No data yet"
+    summaryNoData: "No data yet",
+    exportExcel: "Export to Excel",
+    exportNoData: "No products to export"
   }
 };
