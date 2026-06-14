@@ -777,7 +777,154 @@ export default function InventoryScreen({ t }) {
             {products.length === 0 ? t.emptyState : search.trim() ? t.productNotFound : t.emptyState}
           </div>
         ) : (
-          <div className="glass overflow-x-auto rounded-3xl sm:rounded-2xl">
+          <>
+            <div className="space-y-3 sm:hidden">
+              {filtered.map((p) => {
+                const cardImage = String(p.details?.imageRef || p.imageUrl || "").trim();
+                const details = p.details || {};
+                const isExpanded = expandedIds.includes(p.id);
+                const hasStockCount = details.totalProductCount !== undefined && details.totalProductCount !== null && String(details.totalProductCount).trim() !== "";
+                const stockCount = Number(details.totalProductCount);
+                const isLowStock = hasStockCount && Number.isFinite(stockCount) && stockCount <= 15;
+
+                const basePairs = [
+                  { key: t.barcode, value: p.barcode || "-" },
+                  { key: t.price, value: Number(p.price || 0).toFixed(2) }
+                ];
+
+                const optionalPairs = [
+                  { key: t.productCode, value: details.productCode },
+                  { key: t.containerNumber, value: details.containerNumber },
+                  { key: t.warehouseLocation, value: details.warehouseLocation },
+                  { key: t.totalProductCount, value: details.totalProductCount },
+                  { key: t.unitKg, value: details.unitKg },
+                  { key: t.totalKg, value: details.totalKg },
+                  { key: t.widthCm, value: details.widthCm },
+                  { key: t.lengthCm, value: details.lengthCm },
+                  { key: t.heightCm, value: details.heightCm },
+                  { key: t.unitM3, value: details.unitM3 },
+                  { key: t.totalM3, value: details.totalM3 }
+                ];
+
+                const hasFeatures = typeof details.features === "string" && details.features.trim().length > 0;
+
+                return (
+                  <div key={p.id} className="glass rounded-2xl p-3">
+                    <div className="flex items-start gap-3">
+                      {bulkMode ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(p.id)}
+                          onChange={() => onToggleSelected(p.id)}
+                          className="mt-1 h-5 w-5 shrink-0 accent-cyan-300"
+                        />
+                      ) : null}
+
+                      {cardImage ? (
+                        <img src={cardImage} alt={p.name} className="h-16 w-16 shrink-0 rounded-xl border border-white/10 object-cover" />
+                      ) : (
+                        <div className="h-16 w-16 shrink-0 rounded-xl border border-white/10 bg-slate-900/40" />
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words font-semibold text-slate-100">{p.name}</p>
+                        {details.productCode ? (
+                          <p className="break-words text-xs text-slate-500">{details.productCode}</p>
+                        ) : null}
+
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                          <span className="text-slate-400">
+                            {t.warehouseLocation}: <span className="text-slate-200">{details.warehouseLocation || "-"}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 text-slate-400">
+                            {t.columnStock}:
+                            {hasStockCount ? (
+                              <span className={isLowStock ? "font-bold text-rose-400" : "text-slate-200"}>
+                                {details.totalProductCount}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
+                            {isLowStock ? (
+                              <span className="inline-flex items-center rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[10px] font-bold text-rose-300">
+                                {t.lowStock}
+                              </span>
+                            ) : null}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onToggleExpanded(p.id)}
+                        className="rounded-lg border border-cyan-300/20 bg-slate-950/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-cyan-200"
+                      >
+                        {isExpanded ? t.hideDetails : t.showDetails}
+                      </button>
+
+                      {!bulkMode ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(p)}
+                            className="rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-200"
+                          >
+                            {t.editProduct}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete(p)}
+                            className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-300"
+                          >
+                            {t.deleteProduct}
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+
+                    {isExpanded ? (
+                      <div className="mt-3 border-t border-white/5 pt-3">
+                        <div className="grid gap-x-3 gap-y-1 text-xs">
+                          {basePairs.map((item) => (
+                            <p key={item.key} className="text-slate-300">
+                              <span className="text-slate-500">{item.key}:</span> {item.value}
+                            </p>
+                          ))}
+                        </div>
+
+                        {optionalPairs.length > 0 || hasFeatures ? (
+                          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-cyan-200">
+                              {t.optionalDetailsTitle}
+                            </p>
+
+                            {optionalPairs.length > 0 ? (
+                              <div className="grid gap-x-3 gap-y-1 text-xs">
+                                {optionalPairs.map((item) => (
+                                  <p key={item.key} className="text-slate-300">
+                                    <span className="text-slate-500">{item.key}:</span> {item.value !== undefined && item.value !== null && String(item.value).trim() !== "" ? String(item.value) : "-"}
+                                  </p>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            {hasFeatures ? (
+                              <p className="mt-2 text-xs text-slate-300">
+                                <span className="text-slate-500">{t.features}:</span> {details.features}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="glass hidden overflow-x-auto rounded-3xl sm:block sm:rounded-2xl">
             <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
@@ -945,7 +1092,8 @@ export default function InventoryScreen({ t }) {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
