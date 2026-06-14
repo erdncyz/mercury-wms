@@ -139,7 +139,21 @@ export const labels = {
     columnProduct: "Urun",
     columnStock: "Stok",
     columnActions: "Islemler",
-    columnDetails: "Detay"
+    columnDetails: "Detay",
+    sortBy: "Sirala",
+    sortNameAsc: "Isim (A-Z)",
+    sortNameDesc: "Isim (Z-A)",
+    sortStockAsc: "Stok (Az-Cok)",
+    sortStockDesc: "Stok (Cok-Az)",
+    sortPriceAsc: "Fiyat (Dusuk-Yuksek)",
+    sortPriceDesc: "Fiyat (Yuksek-Dusuk)",
+    sortWarehouseAsc: "Depo (A-Z)",
+    sortWarehouseDesc: "Depo (Z-A)",
+    showingRange: "{from}-{to} / {total} urun",
+    previousPage: "Onceki",
+    nextPage: "Sonraki",
+    pageOf: "Sayfa {page} / {pages}",
+    perPage: "Sayfa basina"
   },
   en: {
     appName: "Mercury WMS",
@@ -281,6 +295,20 @@ export const labels = {
     columnProduct: "Product",
     columnStock: "Stock",
     columnActions: "Actions",
-    columnDetails: "Details"
+    columnDetails: "Details",
+    sortBy: "Sort",
+    sortNameAsc: "Name (A-Z)",
+    sortNameDesc: "Name (Z-A)",
+    sortStockAsc: "Stock (Low-High)",
+    sortStockDesc: "Stock (High-Low)",
+    sortPriceAsc: "Price (Low-High)",
+    sortPriceDesc: "Price (High-Low)",
+    sortWarehouseAsc: "Warehouse (A-Z)",
+    sortWarehouseDesc: "Warehouse (Z-A)",
+    showingRange: "{from}-{to} of {total} products",
+    previousPage: "Previous",
+    nextPage: "Next",
+    pageOf: "Page {page} / {pages}",
+    perPage: "Per page"
   }
 };

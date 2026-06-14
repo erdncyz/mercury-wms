@@ -123,6 +123,9 @@ export default function InventoryScreen({ t }) {
   const [search, setSearch] = useState("");
   const [warehouseFilter, setWarehouseFilter] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [sortBy, setSortBy] = useState("nameAsc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [expandedIds, setExpandedIds] = useState([]);
   const [editing, setEditing] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -187,6 +190,71 @@ export default function InventoryScreen({ t }) {
       return name.includes(q) || barcode.includes(q) || productCode.includes(q);
     });
   }, [products, search, warehouseFilter, lowStockOnly]);
+
+  const sorted = useMemo(() => {
+    const getStock = (p) => {
+      const raw = p.details?.totalProductCount;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : -1;
+    };
+    const getName = (p) => String(p.name || "").toLocaleLowerCase("tr");
+    const getWarehouse = (p) => String(p.details?.warehouseLocation || "").toLocaleLowerCase("tr");
+    const getPrice = (p) => Number(p.price || 0);
+
+    const rows = [...filtered];
+
+    switch (sortBy) {
+      case "nameDesc":
+        rows.sort((a, b) => getName(b).localeCompare(getName(a), "tr"));
+        break;
+      case "stockAsc":
+        rows.sort((a, b) => getStock(a) - getStock(b));
+        break;
+      case "stockDesc":
+        rows.sort((a, b) => getStock(b) - getStock(a));
+        break;
+      case "priceAsc":
+        rows.sort((a, b) => getPrice(a) - getPrice(b));
+        break;
+      case "priceDesc":
+        rows.sort((a, b) => getPrice(b) - getPrice(a));
+        break;
+      case "warehouseAsc":
+        rows.sort((a, b) => getWarehouse(a).localeCompare(getWarehouse(b), "tr"));
+        break;
+      case "warehouseDesc":
+        rows.sort((a, b) => getWarehouse(b).localeCompare(getWarehouse(a), "tr"));
+        break;
+      case "nameAsc":
+      default:
+        rows.sort((a, b) => getName(a).localeCompare(getName(b), "tr"));
+        break;
+    }
+
+    return rows;
+  }, [filtered, sortBy]);
+
+  const totalCount = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paged = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, currentPage, pageSize]);
+
+  const rangeFrom = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeTo = Math.min(currentPage * pageSize, totalCount);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, warehouseFilter, lowStockOnly, sortBy, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const isCreating = Boolean(editing && !editing.id);
 
@@ -697,6 +765,22 @@ export default function InventoryScreen({ t }) {
             <span className={`h-2 w-2 rounded-full ${lowStockOnly ? "bg-rose-400" : "bg-slate-500"}`} />
             {t.lowStock}
           </button>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-300 sm:max-w-[220px]"
+            aria-label={t.sortBy}
+          >
+            <option value="nameAsc">{t.sortNameAsc}</option>
+            <option value="nameDesc">{t.sortNameDesc}</option>
+            <option value="stockAsc">{t.sortStockAsc}</option>
+            <option value="stockDesc">{t.sortStockDesc}</option>
+            <option value="priceAsc">{t.sortPriceAsc}</option>
+            <option value="priceDesc">{t.sortPriceDesc}</option>
+            <option value="warehouseAsc">{t.sortWarehouseAsc}</option>
+            <option value="warehouseDesc">{t.sortWarehouseDesc}</option>
+          </select>
         </div>
 
         {isSearchScannerOpen ? (
@@ -779,7 +863,7 @@ export default function InventoryScreen({ t }) {
         ) : (
           <>
             <div className="space-y-3 sm:hidden">
-              {filtered.map((p) => {
+              {paged.map((p) => {
                 const cardImage = String(p.details?.imageRef || p.imageUrl || "").trim();
                 const details = p.details || {};
                 const isExpanded = expandedIds.includes(p.id);
@@ -937,7 +1021,7 @@ export default function InventoryScreen({ t }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => {
+                {paged.map((p) => {
                   const cardImage = String(p.details?.imageRef || p.imageUrl || "").trim();
                   const details = p.details || {};
                   const isExpanded = expandedIds.includes(p.id);
@@ -1092,6 +1176,45 @@ export default function InventoryScreen({ t }) {
                 })}
               </tbody>
             </table>
+            </div>
+
+            <div className="glass flex flex-col gap-3 rounded-2xl p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <span>{t.showingRange.replace("{from}", String(rangeFrom)).replace("{to}", String(rangeTo)).replace("{total}", String(totalCount))}</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="rounded-xl border border-white/10 bg-slate-900/60 px-2 py-1 text-xs outline-none focus:border-cyan-300"
+                  aria-label={t.perPage}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage <= 1}
+                  className="rounded-xl border border-white/15 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-40"
+                >
+                  {t.previousPage}
+                </button>
+                <span className="text-xs text-slate-300">
+                  {t.pageOf.replace("{page}", String(currentPage)).replace("{pages}", String(totalPages))}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="rounded-xl border border-white/15 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-40"
+                >
+                  {t.nextPage}
+                </button>
+              </div>
             </div>
           </>
         )}
