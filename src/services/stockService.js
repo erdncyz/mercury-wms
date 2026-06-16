@@ -294,6 +294,82 @@ export async function applyStockChange({ productId, productName, amount, type })
   });
 }
 
+export async function transferStock({ sourceProduct, amount, targetWarehouse, targetProductId }) {
+  const parsedAmount = Math.floor(Number(amount));
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    throw new Error("INVALID_AMOUNT");
+  }
+
+  const targetWh = String(targetWarehouse || "").trim();
+  if (!targetWh) throw new Error("INVALID_TARGET");
+  if (!sourceProduct?.id) throw new Error("INVALID_SOURCE");
+
+  const sourceRef = doc(db, "products", sourceProduct.id);
+  let targetLogId = targetProductId || "";
+
+  await runTransaction(db, async (tx) => {
+    const sourceSnap = await tx.get(sourceRef);
+    if (!sourceSnap.exists()) throw new Error("Product not found");
+
+    const sourceData = sourceSnap.data();
+    const sourceCount = Number(sourceData.details?.totalProductCount || 0);
+    if (parsedAmount > sourceCount) throw new Error("Insufficient stock");
+
+    let targetRef = null;
+    let targetSnap = null;
+    if (targetProductId) {
+      targetRef = doc(db, "products", targetProductId);
+      targetSnap = await tx.get(targetRef);
+    }
+
+    tx.update(sourceRef, {
+      details: { ...(sourceData.details || {}), totalProductCount: sourceCount - parsedAmount },
+      updatedAt: serverTimestamp()
+    });
+
+    if (targetRef && targetSnap?.exists()) {
+      const targetData = targetSnap.data();
+      const targetCount = Number(targetData.details?.totalProductCount || 0);
+      tx.update(targetRef, {
+        details: { ...(targetData.details || {}), totalProductCount: targetCount + parsedAmount },
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      const newRef = doc(collection(db, "products"));
+      targetLogId = newRef.id;
+      const srcDetails = sourceData.details || {};
+      tx.set(newRef, {
+        name: String(sourceData.name || "-").trim() || "-",
+        barcode: String(sourceData.barcode || "").trim(),
+        category: String(sourceData.category || "Genel").trim() || "Genel",
+        quantity: 0,
+        price: Number(sourceData.price || 0),
+        imageUrl: String(sourceData.imageUrl || "").trim(),
+        details: {
+          ...srcDetails,
+          warehouseLocation: targetWh,
+          totalProductCount: parsedAmount
+        },
+        updatedAt: serverTimestamp()
+      });
+    }
+  });
+
+  await logActivity({
+    action: "stock_out",
+    productId: sourceProduct.id,
+    productName: sourceProduct.name,
+    amount: parsedAmount
+  });
+
+  await logActivity({
+    action: "stock_in",
+    productId: targetLogId,
+    productName: sourceProduct.name,
+    amount: parsedAmount
+  });
+}
+
 export function subscribeProducts(callback) {
   const q = query(collection(db, "products"), orderBy("updatedAt", "desc"));
   return onSnapshot(q, (snap) => {

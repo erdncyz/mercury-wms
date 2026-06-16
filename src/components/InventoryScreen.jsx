@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "rea
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
 import * as XLSX from "xlsx";
-import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, updateProduct, uploadProductRefImage } from "../services/stockService";
+import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, transferStock, updateProduct, uploadProductRefImage } from "../services/stockService";
 
 const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "warehouseLocation", "features", "imageRef"];
 const OPTIONAL_NUMERIC_FIELDS = ["totalProductCount", "unitKg", "totalKg", "widthCm", "lengthCm", "heightCm", "unitM3", "totalM3"];
@@ -132,6 +132,8 @@ export default function InventoryScreen({ t }) {
   const [editing, setEditing] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [pendingBulkDelete, setPendingBulkDelete] = useState(false);
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferTarget, setTransferTarget] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [refImageFile, setRefImageFile] = useState(null);
@@ -316,6 +318,8 @@ export default function InventoryScreen({ t }) {
     setError("");
     setMessage("");
     setRefImageFile(null);
+    setTransferAmount("");
+    setTransferTarget("");
     setEditing(emptyEditableProduct());
     setScannerTarget("");
     setScanError("");
@@ -325,6 +329,8 @@ export default function InventoryScreen({ t }) {
     setError("");
     setMessage("");
     setRefImageFile(null);
+    setTransferAmount("");
+    setTransferTarget("");
     setEditing({
       id: product.id,
       name: product.name || "",
@@ -736,6 +742,67 @@ export default function InventoryScreen({ t }) {
 
     const date = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(workbook, `mercury-wms-stok-${date}.xlsx`);
+  };
+
+  const onTransferStock = async () => {
+    if (!editing?.id) return;
+
+    const amount = Math.floor(Number(transferAmount));
+    const currentStock = Number(editing.details?.totalProductCount || 0);
+    const target = String(transferTarget || "").trim();
+    const source = String(editing.details?.warehouseLocation || "").trim();
+
+    setError("");
+    setMessage("");
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError(t.transferInvalidAmount);
+      return;
+    }
+    if (!target) {
+      setError(t.transferSelectTarget);
+      return;
+    }
+    if (target === source) {
+      setError(t.transferSameWarehouse);
+      return;
+    }
+    if (amount > currentStock) {
+      setError(t.transferInsufficient);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const productCode = String(editing.details?.productCode || "").trim().toLowerCase();
+      const targetProduct = products.find((p) => (
+        p.id !== editing.id
+        && String(p.details?.warehouseLocation || "").trim() === target
+        && productCode !== ""
+        && String(p.details?.productCode || "").trim().toLowerCase() === productCode
+      ));
+
+      await transferStock({
+        sourceProduct: { id: editing.id, name: editing.name },
+        amount,
+        targetWarehouse: target,
+        targetProductId: targetProduct?.id || null
+      });
+
+      setMessage(t.transferSuccess.replace("{amount}", String(amount)).replace("{warehouse}", target));
+      setTransferAmount("");
+      setTransferTarget("");
+      await closeEditModal();
+    } catch (transferError) {
+      const msg = String(transferError?.message || "");
+      if (msg.includes("Insufficient")) {
+        setError(t.transferInsufficient);
+      } else {
+        setError(t.saveError);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onSaveEdit = async (event) => {
@@ -1520,6 +1587,55 @@ export default function InventoryScreen({ t }) {
 
               {scanError ? <p className="text-xs text-rose-300">{scanError}</p> : null}
             </div>
+
+            {!isCreating ? (
+              <div className="rounded-2xl border border-amber-300/20 bg-amber-300/5 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-amber-200">{t.transferTitle}</p>
+                  <span className="text-[11px] text-slate-400">
+                    {t.transferCurrentStock.replace("{count}", String(editing.details?.totalProductCount ?? 0))}
+                  </span>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.transferAmount}</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={transferAmount}
+                      onChange={(e) => setTransferAmount(e.target.value)}
+                      placeholder={t.transferAmount}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-amber-300"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.transferTarget}</span>
+                    <select
+                      value={transferTarget}
+                      onChange={(e) => setTransferTarget(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-amber-300"
+                    >
+                      <option value="">{t.selectWarehouse}</option>
+                      {[t.warehouseSiteler, t.warehouseAkyurt]
+                        .filter((w) => w !== String(editing.details?.warehouseLocation || "").trim())
+                        .map((w) => (
+                          <option key={w} value={w}>{w}</option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onTransferStock}
+                  className="w-full rounded-xl border border-amber-300/35 bg-amber-300/10 px-3 py-2 text-sm font-bold text-amber-200 disabled:opacity-50"
+                >
+                  {t.transferButton}
+                </button>
+              </div>
+            ) : null}
 
             <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-3 space-y-2">
               <p className="text-xs font-semibold text-slate-300">{t.optionalDetailsTitle}</p>

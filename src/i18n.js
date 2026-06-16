@@ -182,7 +182,17 @@ export const labels = {
     activityNoRecords: "Henuz kayit yok",
     activityNoMatch: "Eslesen kayit bulunamadi",
     activityRefresh: "Yenile",
-    activityExport: "Loglari disa aktar"
+    activityExport: "Loglari disa aktar",
+    transferTitle: "Depo Transferi",
+    transferCurrentStock: "Mevcut stok: {count}",
+    transferAmount: "Transfer Adedi",
+    transferTarget: "Hedef Depo",
+    transferButton: "Transfer Et",
+    transferSelectTarget: "Hedef depo secin",
+    transferInvalidAmount: "Gecerli bir adet girin",
+    transferSameWarehouse: "Hedef depo mevcut depodan farkli olmali",
+    transferInsufficient: "Yetersiz stok",
+    transferSuccess: "{amount} adet {warehouse} deposuna transfer edildi"
   },
   en: {
     appName: "Mercury WMS",
@@ -367,6 +377,16 @@ export const labels = {
     activityNoRecords: "No records yet",
     activityNoMatch: "No matching records",
     activityRefresh: "Refresh",
-    activityExport: "Export logs"
+    activityExport: "Export logs",
+    transferTitle: "Warehouse Transfer",
+    transferCurrentStock: "Current stock: {count}",
+    transferAmount: "Transfer Amount",
+    transferTarget: "Target Warehouse",
+    transferButton: "Transfer",
+    transferSelectTarget: "Select a target warehouse",
+    transferInvalidAmount: "Enter a valid amount",
+    transferSameWarehouse: "Target must differ from current warehouse",
+    transferInsufficient: "Insufficient stock",
+    transferSuccess: "{amount} units transferred to {warehouse}"
   }
 };
