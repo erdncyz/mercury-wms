@@ -1531,20 +1531,18 @@ export default function InventoryScreen({ t }) {
                     className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
                   />
                 </label>
-                {isCreating ? (
-                  <label className="space-y-1">
-                    <span className="text-[11px] text-slate-400">{t.warehouseLocation}</span>
-                    <select
-                      value={editing.details?.warehouseLocation ?? ""}
-                      onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), warehouseLocation: e.target.value } }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
-                    >
-                      <option value="">{t.selectWarehouse}</option>
-                      <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
-                      <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
-                    </select>
-                  </label>
-                ) : null}
+                <label className="space-y-1">
+                  <span className="text-[11px] text-slate-400">{t.warehouseLocation}</span>
+                  <select
+                    value={editing.details?.warehouseLocation ?? ""}
+                    onChange={(e) => setEditing((prev) => ({ ...prev, details: { ...(prev.details || {}), warehouseLocation: e.target.value } }))}
+                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+                  >
+                    <option value="">{t.selectWarehouse}</option>
+                    <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
+                    <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
+                  </select>
+                </label>
                 {!isCreating ? (
                   <label className="space-y-1">
                     <span className="text-[11px] text-slate-400">{t.containerNumber}</span>
