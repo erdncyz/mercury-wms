@@ -644,7 +644,7 @@ export default function InventoryScreen({ t }) {
   const onDelete = async () => {
     if (!pendingDelete) return;
     try {
-      await deleteProduct(pendingDelete.id);
+      await deleteProduct(pendingDelete.id, pendingDelete.name);
       setMessage(t.deleteSuccess);
       setPendingDelete(null);
     } catch {
@@ -687,7 +687,10 @@ export default function InventoryScreen({ t }) {
     setError("");
     setMessage("");
     try {
-      await deleteProductsBulk(selectedIds);
+      const selectedProducts = products
+        .filter((p) => selectedIds.includes(p.id))
+        .map((p) => ({ id: p.id, name: p.name }));
+      await deleteProductsBulk(selectedProducts);
       setSelectedIds([]);
       setBulkMode(false);
       setPendingBulkDelete(false);

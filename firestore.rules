@@ -91,6 +91,29 @@ service cloud.firestore {
         && data.timestamp is timestamp;
     }
 
+    function isValidActivityLogData(data) {
+      return data.keys().hasOnly([
+          'action',
+          'productId',
+          'productName',
+          'amount',
+          'userId',
+          'userName',
+          'timestamp'
+        ])
+        && (data.action == 'create'
+          || data.action == 'update'
+          || data.action == 'delete'
+          || data.action == 'stock_in'
+          || data.action == 'stock_out')
+        && isString(data.productId, 128)
+        && isNonEmptyString(data.productName, 200)
+        && data.amount is number
+        && isString(data.userId, 128)
+        && isString(data.userName, 200)
+        && data.timestamp is timestamp;
+    }
+
     match /products/{productId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidProductData(request.resource.data);
@@ -101,6 +124,12 @@ service cloud.firestore {
     match /stock_logs/{logId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidStockLogData(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /activity_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidActivityLogData(request.resource.data);
       allow update, delete: if false;
     }
 

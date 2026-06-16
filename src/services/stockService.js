@@ -14,7 +14,32 @@ import {
   orderBy,
   writeBatch
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
+
+function getActor() {
+  const current = auth.currentUser;
+  return {
+    userId: current?.uid || "",
+    userName: current?.displayName || current?.email || ""
+  };
+}
+
+async function logActivity({ action, productId, productName, amount = 0 }) {
+  try {
+    const actor = getActor();
+    await addDoc(collection(db, "activity_logs"), {
+      action,
+      productId: String(productId || ""),
+      productName: String(productName || "").trim().slice(0, 200) || "-",
+      amount: Number.isFinite(Number(amount)) ? Number(amount) : 0,
+      userId: actor.userId,
+      userName: actor.userName,
+      timestamp: serverTimestamp()
+    });
+  } catch {
+    // Activity logging must never block the main operation.
+  }
+}
 
 async function compressImageFile(file, { maxSide = 640, quality = 0.5 } = {}) {
   if (!file || !String(file.type || "").startsWith("image/")) {
@@ -116,6 +141,13 @@ export async function createProduct(payload) {
         amount: incomingQty,
         timestamp: serverTimestamp()
       });
+
+      await logActivity({
+        action: "stock_in",
+        productId: existing.id,
+        productName: normalizedName || existing.name,
+        amount: incomingQty
+      });
     }
 
     return {
@@ -142,6 +174,13 @@ export async function createProduct(payload) {
     type: "IN",
     amount: incomingQty,
     timestamp: serverTimestamp()
+  });
+
+  await logActivity({
+    action: "create",
+    productId: productRef.id,
+    productName: normalizedName,
+    amount: incomingQty
   });
 
   return {
@@ -175,22 +214,44 @@ export async function updateProduct(productId, payload) {
   };
 
   await updateDoc(productRef, nextData);
+
+  await logActivity({
+    action: "update",
+    productId,
+    productName: nextData.name
+  });
 }
 
-export async function deleteProduct(productId) {
+export async function deleteProduct(productId, productName) {
   await deleteDoc(doc(db, "products", productId));
+
+  await logActivity({
+    action: "delete",
+    productId,
+    productName
+  });
 }
 
-export async function deleteProductsBulk(productIds) {
-  const ids = Array.isArray(productIds) ? productIds.filter(Boolean) : [];
-  if (ids.length === 0) return;
+export async function deleteProductsBulk(products) {
+  const items = (Array.isArray(products) ? products : [])
+    .map((item) => (typeof item === "string" ? { id: item, name: "" } : item))
+    .filter((item) => item && item.id);
+  if (items.length === 0) return;
 
   const batch = writeBatch(db);
-  ids.forEach((id) => {
-    batch.delete(doc(db, "products", id));
+  items.forEach((item) => {
+    batch.delete(doc(db, "products", item.id));
   });
 
   await batch.commit();
+
+  for (const item of items) {
+    await logActivity({
+      action: "delete",
+      productId: item.id,
+      productName: item.name
+    });
+  }
 }
 
 export async function applyStockChange({ productId, productName, amount, type }) {
@@ -224,10 +285,24 @@ export async function applyStockChange({ productId, productName, amount, type })
     amount: parsedAmount,
     timestamp: serverTimestamp()
   });
+
+  await logActivity({
+    action: type === "IN" ? "stock_in" : "stock_out",
+    productId,
+    productName,
+    amount: parsedAmount
+  });
 }
 
 export function subscribeProducts(callback) {
   const q = query(collection(db, "products"), orderBy("updatedAt", "desc"));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export function subscribeActivityLogs(callback, max = 300) {
+  const q = query(collection(db, "activity_logs"), orderBy("timestamp", "desc"), limit(max));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   });
@@ -307,6 +382,13 @@ export async function importProductsBulk(rawRows, onProgress) {
           type: "IN",
           amount: incomingQty,
           timestamp: serverTimestamp()
+        });
+
+        await logActivity({
+          action: "stock_in",
+          productId: existing.id,
+          productName: row.name,
+          amount: incomingQty
         });
       }
 
