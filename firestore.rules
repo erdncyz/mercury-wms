@@ -81,6 +81,7 @@ service cloud.firestore {
           'productName',
           'type',
           'amount',
+          'destination',
           'timestamp'
         ])
         && isNonEmptyString(data.productId, 128)
@@ -88,6 +89,7 @@ service cloud.firestore {
         && (data.type == 'IN' || data.type == 'OUT')
         && data.amount is number
         && data.amount > 0
+        && (!data.keys().hasAny(['destination']) || isString(data.destination, 200))
         && data.timestamp is timestamp;
     }
 
@@ -97,6 +99,16 @@ service cloud.firestore {
           'productId',
           'productName',
           'amount',
+          'destination',
+          'source',
+          'stockType',
+          'beforeStock',
+          'afterStock',
+          'warehouseFrom',
+          'warehouseTo',
+          'barcode',
+          'changedFields',
+          'summary',
           'userId',
           'userName',
           'timestamp'
@@ -109,6 +121,16 @@ service cloud.firestore {
         && isString(data.productId, 128)
         && isNonEmptyString(data.productName, 200)
         && data.amount is number
+        && (!data.keys().hasAny(['destination']) || isString(data.destination, 200))
+        && (!data.keys().hasAny(['source']) || isString(data.source, 80))
+        && (!data.keys().hasAny(['stockType']) || data.stockType == 'IN' || data.stockType == 'OUT' || data.stockType == '')
+        && (!data.keys().hasAny(['beforeStock']) || data.beforeStock is number)
+        && (!data.keys().hasAny(['afterStock']) || data.afterStock is number)
+        && (!data.keys().hasAny(['warehouseFrom']) || isString(data.warehouseFrom, 120))
+        && (!data.keys().hasAny(['warehouseTo']) || isString(data.warehouseTo, 120))
+        && (!data.keys().hasAny(['barcode']) || isString(data.barcode, 120))
+        && (!data.keys().hasAny(['changedFields']) || (data.changedFields is list && data.changedFields.size() <= 30))
+        && (!data.keys().hasAny(['summary']) || isString(data.summary, 300))
         && isString(data.userId, 128)
         && isString(data.userName, 200)
         && data.timestamp is timestamp;
@@ -130,7 +152,8 @@ service cloud.firestore {
     match /activity_logs/{logId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidActivityLogData(request.resource.data);
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isSignedIn();
     }
 
     match /{document=**} {

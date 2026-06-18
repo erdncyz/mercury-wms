@@ -190,8 +190,9 @@ export default function ActivityLogScreen({ t }) {
       await deleteActivityLog(log.id);
       setSelectedIds((prev) => prev.filter((item) => item !== log.id));
       setActionMessage(t.activityDeleteSuccess);
-    } catch {
-      setActionError(t.activityDeleteError);
+    } catch (error) {
+      const code = String(error?.code || "").toLowerCase();
+      setActionError(code ? `${t.activityDeleteError} (${code})` : t.activityDeleteError);
     } finally {
       setIsDeleting(false);
     }
@@ -217,8 +218,9 @@ export default function ActivityLogScreen({ t }) {
       await deleteActivityLogsBulk(selectedIds);
       setSelectedIds([]);
       setActionMessage(t.activityDeleteBulkSuccess.replace("{count}", String(total)));
-    } catch {
-      setActionError(t.activityDeleteError);
+    } catch (error) {
+      const code = String(error?.code || "").toLowerCase();
+      setActionError(code ? `${t.activityDeleteError} (${code})` : t.activityDeleteError);
     } finally {
       setIsDeleting(false);
     }
