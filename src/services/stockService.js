@@ -576,6 +576,26 @@ export function subscribeActivityLogs(callback, max = 300) {
   });
 }
 
+export async function deleteActivityLog(logId) {
+  const id = String(logId || "").trim();
+  if (!id) return;
+  await deleteDoc(doc(db, "activity_logs", id));
+}
+
+export async function deleteActivityLogsBulk(logIds) {
+  const ids = (Array.isArray(logIds) ? logIds : [])
+    .map((id) => String(id || "").trim())
+    .filter((id) => Boolean(id));
+
+  if (ids.length === 0) return;
+
+  const batch = writeBatch(db);
+  ids.forEach((id) => {
+    batch.delete(doc(db, "activity_logs", id));
+  });
+  await batch.commit();
+}
+
 function normalizeImportedRow(row) {
   const quantity = Number(String(row.quantity ?? 0).replace(",", "."));
   const price = Number(String(row.price ?? 0).replace(",", "."));

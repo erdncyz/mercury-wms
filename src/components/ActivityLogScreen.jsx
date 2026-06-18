@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { subscribeActivityLogs } from "../services/stockService";
+import { deleteActivityLog, deleteActivityLogsBulk, subscribeActivityLogs } from "../services/stockService";
 
 const ACTION_STYLES = {
   create: "border-emerald-300/35 bg-emerald-300/10 text-emerald-200",
@@ -51,6 +51,11 @@ export default function ActivityLogScreen({ t }) {
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     const unsub = subscribeActivityLogs((rows) => {
@@ -121,6 +126,67 @@ export default function ActivityLogScreen({ t }) {
     XLSX.writeFile(workbook, `mercury-wms-loglar-${date}.xlsx`);
   };
 
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((item) => item !== id);
+      return [...prev, id];
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const onDeleteOne = async (log) => {
+    if (!log?.id || isDeleting) return;
+
+    const confirmed = window.confirm(
+      t.activityDeleteConfirmSingle.replace("{name}", String(log.productName || "-"))
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    setActionMessage("");
+    setActionError("");
+
+    try {
+      await deleteActivityLog(log.id);
+      setSelectedIds((prev) => prev.filter((item) => item !== log.id));
+      setActionMessage(t.activityDeleteSuccess);
+    } catch {
+      setActionError(t.activityDeleteError);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const onDeleteSelected = async () => {
+    if (selectedIds.length === 0 || isDeleting) {
+      if (selectedIds.length === 0) setActionError(t.activityNoSelection);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      t.activityDeleteConfirmBulk.replace("{count}", String(selectedIds.length))
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    setActionMessage("");
+    setActionError("");
+
+    try {
+      const total = selectedIds.length;
+      await deleteActivityLogsBulk(selectedIds);
+      setSelectedIds([]);
+      setActionMessage(t.activityDeleteBulkSuccess.replace("{count}", String(total)));
+    } catch {
+      setActionError(t.activityDeleteError);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <section className="space-y-4">
       <div className="glass rounded-3xl p-4">
@@ -129,14 +195,28 @@ export default function ActivityLogScreen({ t }) {
             <h2 className="font-display text-lg font-bold text-slate-100">{t.activityTitle}</h2>
             <p className="mt-1 text-xs text-slate-400">{t.activitySubtitle}</p>
           </div>
-          <button
-            type="button"
-            onClick={onExport}
-            disabled={filtered.length === 0}
-            className="shrink-0 rounded-xl border border-emerald-300/35 bg-emerald-300/10 px-3 py-2 text-xs font-bold text-emerald-200 disabled:opacity-50"
-          >
-            {t.activityExport}
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteMode((prev) => !prev);
+                setActionError("");
+                setActionMessage("");
+                setSelectedIds([]);
+              }}
+              className="rounded-xl border border-rose-300/35 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300"
+            >
+              {deleteMode ? t.activityExitDeleteMode : t.activityDeleteMode}
+            </button>
+            <button
+              type="button"
+              onClick={onExport}
+              disabled={filtered.length === 0}
+              className="rounded-xl border border-emerald-300/35 bg-emerald-300/10 px-3 py-2 text-xs font-bold text-emerald-200 disabled:opacity-50"
+            >
+              {t.activityExport}
+            </button>
+          </div>
         </div>
 
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -159,6 +239,31 @@ export default function ActivityLogScreen({ t }) {
             <option value="stock_out">{t.activityActionStockOut}</option>
           </select>
         </div>
+
+        {deleteMode ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-rose-300/20 bg-rose-500/5 px-3 py-2 text-xs">
+            <span className="text-rose-200">{t.activitySelectedCount.replace("{count}", String(selectedIds.length))}</span>
+            <button
+              type="button"
+              onClick={clearSelection}
+              disabled={selectedIds.length === 0 || isDeleting}
+              className="rounded-lg border border-white/10 px-2 py-1 text-slate-300 disabled:opacity-50"
+            >
+              {t.activityClearSelection}
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteSelected}
+              disabled={selectedIds.length === 0 || isDeleting}
+              className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-2 py-1 font-bold text-rose-300 disabled:opacity-50"
+            >
+              {isDeleting ? t.loading : t.activityDeleteSelected}
+            </button>
+          </div>
+        ) : null}
+
+        {actionMessage ? <p className="mt-3 rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-200">{actionMessage}</p> : null}
+        {actionError ? <p className="mt-3 rounded-xl bg-rose-400/10 px-3 py-2 text-xs text-rose-300">{actionError}</p> : null}
       </div>
 
       <div className="space-y-2">
@@ -179,6 +284,14 @@ export default function ActivityLogScreen({ t }) {
             return (
               <div key={log.id} className="glass rounded-2xl p-3">
                 <div className="flex flex-wrap items-center gap-2">
+                  {deleteMode ? (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(log.id)}
+                      onChange={() => toggleSelected(log.id)}
+                      className="h-4 w-4 accent-rose-400"
+                    />
+                  ) : null}
                   <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${badgeStyle}`}>
                     {actionLabel}
                   </span>
@@ -187,6 +300,19 @@ export default function ActivityLogScreen({ t }) {
                   ) : null}
                   <span className="ml-auto text-[11px] text-slate-400">{formatDateTime(toDate(log.timestamp))}</span>
                 </div>
+
+                {deleteMode ? (
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => onDeleteOne(log)}
+                      disabled={isDeleting}
+                      className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-300 disabled:opacity-50"
+                    >
+                      {isDeleting ? t.loading : t.deleteProduct}
+                    </button>
+                  </div>
+                ) : null}
 
                 <p className="mt-2 break-words font-semibold text-slate-100">{log.productName || "-"}</p>
 
