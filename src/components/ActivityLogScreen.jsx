@@ -50,6 +50,10 @@ export default function ActivityLogScreen({ t }) {
   const [logs, setLogs] = useState([]);
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(true);
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -75,8 +79,19 @@ export default function ActivityLogScreen({ t }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr");
+    const fromDateBoundary = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+    const toDateBoundary = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
+
     return logs.filter((log) => {
       if (actionFilter && log.action !== actionFilter) return false;
+
+      if (fromDateBoundary || toDateBoundary) {
+        const logDate = toDate(log.timestamp);
+        if (!logDate) return false;
+        if (fromDateBoundary && logDate < fromDateBoundary) return false;
+        if (toDateBoundary && logDate > toDateBoundary) return false;
+      }
+
       if (!q) return true;
       const name = String(log.productName || "").toLocaleLowerCase("tr");
       const user = String(log.userName || "").toLocaleLowerCase("tr");
@@ -97,7 +112,29 @@ export default function ActivityLogScreen({ t }) {
         || warehouseTo.includes(q)
         || changedFields.includes(q);
     });
-  }, [logs, search, actionFilter]);
+  }, [logs, search, actionFilter, dateFrom, dateTo]);
+
+  const totalCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paged = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
+
+  const rangeFrom = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeTo = Math.min(currentPage * pageSize, totalCount);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, actionFilter, dateFrom, dateTo, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const onExport = () => {
     if (filtered.length === 0) return;
@@ -240,6 +277,41 @@ export default function ActivityLogScreen({ t }) {
           </select>
         </div>
 
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <label className="space-y-1">
+            <span className="text-[11px] text-slate-400">{t.activityDateFrom}</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-[11px] text-slate-400">{t.activityDateTo}</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+          </label>
+
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+              className="w-full rounded-2xl border border-white/10 px-3 py-2 text-xs text-slate-300"
+            >
+              {t.activityClearDateFilter}
+            </button>
+          </div>
+        </div>
+
         {deleteMode ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-rose-300/20 bg-rose-500/5 px-3 py-2 text-xs">
             <span className="text-rose-200">{t.activitySelectedCount.replace("{count}", String(selectedIds.length))}</span>
@@ -269,12 +341,12 @@ export default function ActivityLogScreen({ t }) {
       <div className="space-y-2">
         {loading ? (
           <div className="glass rounded-2xl px-4 py-4 text-sm text-slate-300">{t.loading}</div>
-        ) : filtered.length === 0 ? (
+        ) : totalCount === 0 ? (
           <div className="glass rounded-2xl px-4 py-4 text-sm text-slate-300">
             {logs.length === 0 ? t.activityNoRecords : t.activityNoMatch}
           </div>
         ) : (
-          filtered.map((log) => {
+          paged.map((log) => {
             const badgeStyle = ACTION_STYLES[log.action] || "border-white/15 bg-slate-900/40 text-slate-200";
             const isStock = log.action === "stock_in" || log.action === "stock_out";
             const sign = log.action === "stock_in" ? "+" : log.action === "stock_out" ? "-" : "";
@@ -365,6 +437,58 @@ export default function ActivityLogScreen({ t }) {
           })
         )}
       </div>
+
+      {!loading && totalCount > 0 ? (
+        <div className="glass rounded-2xl px-3 py-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-slate-300">
+              {t.showingRange
+                .replace("{from}", String(rangeFrom))
+                .replace("{to}", String(rangeTo))
+                .replace("{total}", String(totalCount))}
+            </p>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400">{t.perPage}</span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value) || 25)}
+                className="rounded-xl border border-white/10 bg-slate-900/60 px-2 py-1 text-xs outline-none focus:border-cyan-300"
+              >
+                {[10, 25, 50, 100].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage <= 1}
+              className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:opacity-50"
+            >
+              {t.previousPage}
+            </button>
+
+            <p className="text-xs text-slate-300">
+              {t.pageOf
+                .replace("{page}", String(currentPage))
+                .replace("{pages}", String(totalPages))}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage >= totalPages}
+              className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:opacity-50"
+            >
+              {t.nextPage}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
