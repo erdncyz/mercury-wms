@@ -58,6 +58,12 @@ export default function ActivityLogScreen({ t }) {
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    open: false,
+    mode: "single",
+    log: null,
+    ids: []
+  });
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
 
@@ -177,11 +183,6 @@ export default function ActivityLogScreen({ t }) {
   const onDeleteOne = async (log) => {
     if (!log?.id || isDeleting) return;
 
-    const confirmed = window.confirm(
-      t.activityDeleteConfirmSingle.replace("{name}", String(log.productName || "-"))
-    );
-    if (!confirmed) return;
-
     setIsDeleting(true);
     setActionMessage("");
     setActionError("");
@@ -199,31 +200,59 @@ export default function ActivityLogScreen({ t }) {
   };
 
   const onDeleteSelected = async () => {
-    if (selectedIds.length === 0 || isDeleting) {
-      if (selectedIds.length === 0) setActionError(t.activityNoSelection);
+    if (isDeleting) {
       return;
     }
 
-    const confirmed = window.confirm(
-      t.activityDeleteConfirmBulk.replace("{count}", String(selectedIds.length))
-    );
-    if (!confirmed) return;
+    if (deleteConfirm.ids.length === 0) {
+      setActionError(t.activityNoSelection);
+      return;
+    }
 
     setIsDeleting(true);
     setActionMessage("");
     setActionError("");
 
     try {
-      const total = selectedIds.length;
-      await deleteActivityLogsBulk(selectedIds);
+      const total = deleteConfirm.ids.length;
+      await deleteActivityLogsBulk(deleteConfirm.ids);
       setSelectedIds([]);
       setActionMessage(t.activityDeleteBulkSuccess.replace("{count}", String(total)));
     } catch (error) {
       const code = String(error?.code || "").toLowerCase();
       setActionError(code ? `${t.activityDeleteError} (${code})` : t.activityDeleteError);
     } finally {
+      setDeleteConfirm({ open: false, mode: "single", log: null, ids: [] });
       setIsDeleting(false);
     }
+  };
+
+  const openDeleteOneConfirm = (log) => {
+    if (!log?.id || isDeleting) return;
+    setDeleteConfirm({ open: true, mode: "single", log, ids: [] });
+  };
+
+  const openDeleteBulkConfirm = () => {
+    if (selectedIds.length === 0 || isDeleting) {
+      if (selectedIds.length === 0) setActionError(t.activityNoSelection);
+      return;
+    }
+    setDeleteConfirm({ open: true, mode: "bulk", log: null, ids: [...selectedIds] });
+  };
+
+  const closeDeleteConfirm = () => {
+    if (isDeleting) return;
+    setDeleteConfirm({ open: false, mode: "single", log: null, ids: [] });
+  };
+
+  const onConfirmDelete = async () => {
+    if (deleteConfirm.mode === "single") {
+      await onDeleteOne(deleteConfirm.log);
+      setDeleteConfirm({ open: false, mode: "single", log: null, ids: [] });
+      return;
+    }
+
+    await onDeleteSelected();
   };
 
   return (
@@ -327,7 +356,7 @@ export default function ActivityLogScreen({ t }) {
             </button>
             <button
               type="button"
-              onClick={onDeleteSelected}
+              onClick={openDeleteBulkConfirm}
               disabled={selectedIds.length === 0 || isDeleting}
               className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-2 py-1 font-bold text-rose-300 disabled:opacity-50"
             >
@@ -379,7 +408,7 @@ export default function ActivityLogScreen({ t }) {
                   <div className="mt-2 flex justify-end">
                     <button
                       type="button"
-                      onClick={() => onDeleteOne(log)}
+                      onClick={() => openDeleteOneConfirm(log)}
                       disabled={isDeleting}
                       className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-300 disabled:opacity-50"
                     >
@@ -488,6 +517,38 @@ export default function ActivityLogScreen({ t }) {
             >
               {t.nextPage}
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteConfirm.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4">
+          <div className="glass w-full max-w-md rounded-3xl border border-white/10 p-4">
+            <h3 className="font-display text-lg font-bold text-slate-100">{t.activityDeleteMode}</h3>
+            <p className="mt-2 text-sm text-slate-300">
+              {deleteConfirm.mode === "single"
+                ? t.activityDeleteConfirmSingle.replace("{name}", String(deleteConfirm.log?.productName || "-"))
+                : t.activityDeleteConfirmBulk.replace("{count}", String(deleteConfirm.ids.length))}
+            </p>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeDeleteConfirm}
+                disabled={isDeleting}
+                className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 disabled:opacity-50"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmDelete}
+                disabled={isDeleting}
+                className="rounded-xl border border-rose-300/35 bg-rose-500/10 px-3 py-2 text-sm font-bold text-rose-300 disabled:opacity-50"
+              >
+                {isDeleting ? t.loading : deleteConfirm.mode === "single" ? t.deleteProduct : t.activityDeleteSelected}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
