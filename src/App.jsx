@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   HiOutlineArrowRightOnRectangle,
+  HiOutlineBuildingStorefront,
   HiOutlineChevronDown,
   HiOutlineClipboardDocumentList,
   HiOutlineLanguage,
@@ -16,6 +17,7 @@ const AuthScreen = lazy(() => import("./components/AuthScreen"));
 const InventoryScreen = lazy(() => import("./components/InventoryScreen"));
 const ScannerScreen = lazy(() => import("./components/ScannerScreen"));
 const ActivityLogScreen = lazy(() => import("./components/ActivityLogScreen"));
+const DealerManagementScreen = lazy(() => import("./components/DealerManagementScreen"));
 const CREATOR_URL = "https://erdincyilmaz.netlify.app/";
 
 export default function App() {
@@ -128,11 +130,12 @@ export default function App() {
           {activeTab === "scan" ? <ScannerScreen t={t} /> : null}
           {activeTab === "list" ? <InventoryScreen t={t} /> : null}
           {activeTab === "logs" ? <ActivityLogScreen t={t} /> : null}
+          {activeTab === "dealers" ? <DealerManagementScreen t={t} /> : null}
         </Suspense>
       </main>
 
       <nav className="bottom-nav-shell fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:p-3">
-        <div className="mx-auto grid w-full max-w-4xl grid-cols-3 gap-1.5 sm:gap-2">
+        <div className="mx-auto grid w-full max-w-4xl grid-cols-4 gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={() => setActiveTab("list")}
@@ -164,6 +167,17 @@ export default function App() {
           >
             <HiOutlineClipboardDocumentList className="h-5 w-5 shrink-0 sm:h-[22px] sm:w-[22px]" />
             <span className="truncate">{t.logTab}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("dealers")}
+            className={`tab-pill flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[0.95rem] tracking-[0.005em] sm:gap-2 sm:rounded-2xl sm:py-4 sm:text-base ${
+              activeTab === "dealers" ? "tab-pill-active" : ""
+            }`}
+          >
+            <HiOutlineBuildingStorefront className="h-5 w-5 shrink-0 sm:h-[22px] sm:w-[22px]" />
+            <span className="truncate">{t.dealerTab}</span>
           </button>
         </div>
       </nav>

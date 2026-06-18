@@ -504,6 +504,31 @@ export async function createDealer(payload) {
   return { id: ref.id, ...next };
 }
 
+export async function updateDealer(dealerId, payload) {
+  const id = String(dealerId || "").trim();
+  if (!id) {
+    throw new Error("INVALID_DEALER_ID");
+  }
+
+  const next = normalizeDealerPayload(payload);
+  if (!next.name) {
+    throw new Error("INVALID_DEALER_NAME");
+  }
+
+  await updateDoc(doc(db, "dealers", id), {
+    ...next,
+    updatedAt: serverTimestamp()
+  });
+
+  return { id, ...next };
+}
+
+export async function deleteDealer(dealerId) {
+  const id = String(dealerId || "").trim();
+  if (!id) return;
+  await deleteDoc(doc(db, "dealers", id));
+}
+
 export function subscribeDealers(callback, max = 500) {
   const q = query(collection(db, "dealers"), orderBy("name", "asc"), limit(max));
   return onSnapshot(q, (snap) => {

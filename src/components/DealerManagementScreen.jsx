@@ -1,0 +1,384 @@
+import { useEffect, useMemo, useState } from "react";
+import { createDealer, deleteDealer, subscribeDealers, updateDealer } from "../services/stockService";
+
+function emptyDealerForm() {
+  return {
+    name: "",
+    code: "",
+    contactName: "",
+    phone: "",
+    email: "",
+    city: "",
+    address: "",
+    note: ""
+  };
+}
+
+function mapSaveError(error, t) {
+  const code = String(error?.code || error?.message || "").toLowerCase();
+  if (code.includes("permission-denied")) {
+    return t.permissionDeniedHint;
+  }
+  return code ? `${t.saveError}: ${code}` : t.saveError;
+}
+
+export default function DealerManagementScreen({ t }) {
+  const [dealers, setDealers] = useState([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [form, setForm] = useState(emptyDealerForm());
+  const [editingId, setEditingId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState(null);
+
+  useEffect(() => {
+    const unsub = subscribeDealers((rows) => {
+      setDealers(rows);
+    });
+    return () => unsub();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = String(search || "").trim().toLocaleLowerCase("tr");
+    if (!q) return dealers;
+
+    return dealers.filter((dealer) => {
+      const haystack = [
+        dealer.name,
+        dealer.code,
+        dealer.contactName,
+        dealer.phone,
+        dealer.email,
+        dealer.city,
+        dealer.address,
+        dealer.note
+      ]
+        .map((v) => String(v || "").toLocaleLowerCase("tr"))
+        .join(" ");
+
+      return haystack.includes(q);
+    });
+  }, [dealers, search]);
+
+  const totalCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paged = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
+
+  const rangeFrom = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeTo = Math.min(currentPage * pageSize, totalCount);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const resetForm = () => {
+    setForm(emptyDealerForm());
+    setEditingId("");
+  };
+
+  const onSave = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+
+    if (!String(form.name || "").trim()) {
+      setError(t.dealerNameRequired);
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      if (editingId) {
+        await updateDealer(editingId, form);
+        setMessage(t.dealerUpdateSuccess);
+      } else {
+        await createDealer(form);
+        setMessage(t.dealerCreateSuccess);
+      }
+      resetForm();
+    } catch (saveError) {
+      setError(mapSaveError(saveError, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onEdit = (dealer) => {
+    setEditingId(dealer.id);
+    setForm({
+      name: String(dealer.name || ""),
+      code: String(dealer.code || ""),
+      contactName: String(dealer.contactName || ""),
+      phone: String(dealer.phone || ""),
+      email: String(dealer.email || ""),
+      city: String(dealer.city || ""),
+      address: String(dealer.address || ""),
+      note: String(dealer.note || "")
+    });
+    setMessage("");
+    setError("");
+  };
+
+  const onDelete = async () => {
+    if (!pendingDelete?.id || busy) return;
+
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await deleteDealer(pendingDelete.id);
+      setMessage(t.dealerDeleteSuccess);
+      if (editingId === pendingDelete.id) {
+        resetForm();
+      }
+      setPendingDelete(null);
+    } catch (deleteError) {
+      setError(mapSaveError(deleteError, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="space-y-4">
+      <div className="glass rounded-3xl p-4">
+        <h2 className="font-display text-lg font-bold text-slate-100">{t.dealerTab}</h2>
+        <p className="mt-1 text-xs text-slate-400">{t.dealerManagementSubtitle}</p>
+
+        <form onSubmit={onSave} className="mt-3 space-y-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <input
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder={`${t.dealerName} *`}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+            <input
+              value={form.code}
+              onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
+              placeholder={t.dealerCode}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+            <input
+              value={form.contactName}
+              onChange={(e) => setForm((prev) => ({ ...prev, contactName: e.target.value }))}
+              placeholder={t.dealerContactName}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+            <input
+              value={form.phone}
+              onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+              placeholder={t.dealerPhone}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+            <input
+              value={form.email}
+              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+              placeholder={t.email}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+            <input
+              value={form.city}
+              onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
+              placeholder={t.dealerCity}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+          </div>
+
+          <input
+            value={form.address}
+            onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))}
+            placeholder={t.dealerAddress}
+            className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+          />
+
+          <textarea
+            value={form.note}
+            onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))}
+            placeholder={t.dealerNote}
+            rows={2}
+            className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-200 disabled:opacity-50"
+            >
+              {busy ? t.loading : editingId ? t.saveChanges : t.dealerAddButton}
+            </button>
+            {editingId ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                disabled={busy}
+                className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-300 disabled:opacity-50"
+              >
+                {t.cancel}
+              </button>
+            ) : null}
+          </div>
+        </form>
+
+        {message ? <p className="mt-3 rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-200">{message}</p> : null}
+        {error ? <p className="mt-3 rounded-xl bg-rose-400/10 px-3 py-2 text-xs text-rose-300">{error}</p> : null}
+      </div>
+
+      <div className="glass rounded-3xl p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.dealerSearchPlaceholder}
+            className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-300"
+          />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">{t.perPage}</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value) || 25)}
+              className="rounded-xl border border-white/10 bg-slate-900/60 px-2 py-1 text-xs outline-none focus:border-cyan-300"
+            >
+              {[10, 25, 50, 100].map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {totalCount === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-900/30 px-4 py-3 text-sm text-slate-300">
+              {t.dealerNoRecords}
+            </div>
+          ) : (
+            paged.map((dealer) => (
+              <div key={dealer.id} className="rounded-2xl border border-white/10 bg-slate-900/30 p-3">
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold text-slate-100">{dealer.name || "-"}</p>
+                    <p className="mt-1 text-xs text-slate-400 break-words">
+                      {t.dealerCode}: <span className="text-slate-200">{dealer.code || "-"}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400 break-words">
+                      {t.dealerContactName}: <span className="text-slate-200">{dealer.contactName || "-"}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400 break-words">
+                      {t.dealerPhone}: <span className="text-slate-200">{dealer.phone || "-"}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400 break-words">
+                      {t.dealerCity}: <span className="text-slate-200">{dealer.city || "-"}</span>
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(dealer)}
+                      disabled={busy}
+                      className="rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-2 py-1 text-[11px] font-bold text-cyan-200 disabled:opacity-50"
+                    >
+                      {t.editProduct}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingDelete(dealer)}
+                      disabled={busy}
+                      className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-300 disabled:opacity-50"
+                    >
+                      {t.deleteProduct}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {totalCount > 0 ? (
+          <div className="mt-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-300">
+                {t.showingRange
+                  .replace("{from}", String(rangeFrom))
+                  .replace("{to}", String(rangeTo))
+                  .replace("{total}", String(totalCount))}
+              </p>
+
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage <= 1}
+                  className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:opacity-50"
+                >
+                  {t.previousPage}
+                </button>
+
+                <p className="text-xs text-slate-300">
+                  {t.pageOf
+                    .replace("{page}", String(currentPage))
+                    .replace("{pages}", String(totalPages))}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:opacity-50"
+                >
+                  {t.nextPage}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {pendingDelete ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4">
+          <div className="glass w-full max-w-md rounded-3xl border border-white/10 p-4">
+            <h3 className="font-display text-lg font-bold text-slate-100">{t.dealerDeleteTitle}</h3>
+            <p className="mt-2 text-sm text-slate-300">
+              {t.dealerDeleteConfirm.replace("{name}", String(pendingDelete.name || "-"))}
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                disabled={busy}
+                className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 disabled:opacity-50"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={busy}
+                className="rounded-xl border border-rose-300/35 bg-rose-500/10 px-3 py-2 text-sm font-bold text-rose-300 disabled:opacity-50"
+              >
+                {busy ? t.loading : t.deleteProduct}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
