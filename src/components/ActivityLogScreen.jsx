@@ -426,6 +426,9 @@ export default function ActivityLogScreen({ t }) {
                 </p>
 
                 <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-slate-400 sm:grid-cols-2">
+                  {log.dealerName ? (
+                    <p>{t.dealerName}: <span className="text-slate-200 break-words">{log.dealerName}</span></p>
+                  ) : null}
                   {Number.isFinite(Number(log.beforeStock)) ? (
                     <p>{t.activityStockBefore}: <span className="text-slate-200">{Number(log.beforeStock)}</span></p>
                   ) : null}

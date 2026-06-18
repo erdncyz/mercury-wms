@@ -46,6 +46,7 @@ function buildActivitySummary(payload) {
     beforeStock,
     afterStock,
     destination,
+    dealerName,
     warehouseFrom,
     warehouseTo,
     changedFields
@@ -67,6 +68,9 @@ function buildActivitySummary(payload) {
     }
     if (destination) {
       return `${base}${stockTrail} | Gonderim: ${destination}`;
+    }
+    if (dealerName) {
+      return `${base}${stockTrail} | Bayi: ${dealerName}`;
     }
     return `${base}${stockTrail}`;
   }
@@ -99,6 +103,8 @@ async function logActivity({
   stockType = "",
   beforeStock = null,
   afterStock = null,
+  dealerId = "",
+  dealerName = "",
   warehouseFrom = "",
   warehouseTo = "",
   barcode = "",
@@ -114,6 +120,7 @@ async function logActivity({
       beforeStock,
       afterStock,
       destination,
+      dealerName,
       warehouseFrom,
       warehouseTo,
       changedFields: cleanedChangedFields
@@ -129,6 +136,8 @@ async function logActivity({
       stockType: String(stockType || "").trim().toUpperCase().slice(0, 8),
       beforeStock: Number.isFinite(Number(beforeStock)) ? Number(beforeStock) : null,
       afterStock: Number.isFinite(Number(afterStock)) ? Number(afterStock) : null,
+      dealerId: String(dealerId || "").trim().slice(0, 128),
+      dealerName: String(dealerName || "").trim().slice(0, 160),
       warehouseFrom: String(warehouseFrom || "").trim().slice(0, 120),
       warehouseTo: String(warehouseTo || "").trim().slice(0, 120),
       barcode: String(barcode || "").trim().slice(0, 120),
@@ -395,10 +404,20 @@ export async function deleteProductsBulk(products) {
   }
 }
 
-export async function applyStockChange({ productId, productName, amount, type, destination = "" }) {
+export async function applyStockChange({
+  productId,
+  productName,
+  amount,
+  type,
+  destination = "",
+  dealerId = "",
+  dealerName = ""
+}) {
   const productDoc = doc(db, "products", productId);
   const parsedAmount = Number(amount);
   const normalizedDestination = String(destination || "").trim().slice(0, 200);
+  const normalizedDealerId = String(dealerId || "").trim().slice(0, 128);
+  const normalizedDealerName = String(dealerName || "").trim().slice(0, 160);
   let beforeStock = 0;
   let afterStock = 0;
   let warehouse = "";
@@ -435,6 +454,8 @@ export async function applyStockChange({ productId, productName, amount, type, d
     type,
     amount: parsedAmount,
     destination: normalizedDestination,
+    dealerId: normalizedDealerId,
+    dealerName: normalizedDealerName,
     timestamp: serverTimestamp()
   });
 
@@ -448,9 +469,45 @@ export async function applyStockChange({ productId, productName, amount, type, d
     stockType: type,
     beforeStock,
     afterStock,
+    dealerId: normalizedDealerId,
+    dealerName: normalizedDealerName,
     warehouseFrom: warehouse,
     warehouseTo: type === "IN" ? warehouse : normalizedDestination,
     barcode
+  });
+}
+
+function normalizeDealerPayload(payload) {
+  return {
+    name: String(payload?.name || "").trim().slice(0, 160),
+    code: String(payload?.code || "").trim().slice(0, 80),
+    contactName: String(payload?.contactName || "").trim().slice(0, 120),
+    phone: String(payload?.phone || "").trim().slice(0, 80),
+    email: String(payload?.email || "").trim().slice(0, 160),
+    city: String(payload?.city || "").trim().slice(0, 120),
+    address: String(payload?.address || "").trim().slice(0, 300),
+    note: String(payload?.note || "").trim().slice(0, 300)
+  };
+}
+
+export async function createDealer(payload) {
+  const next = normalizeDealerPayload(payload);
+  if (!next.name) {
+    throw new Error("INVALID_DEALER_NAME");
+  }
+
+  const ref = await addDoc(collection(db, "dealers"), {
+    ...next,
+    updatedAt: serverTimestamp()
+  });
+
+  return { id: ref.id, ...next };
+}
+
+export function subscribeDealers(callback, max = 500) {
+  const q = query(collection(db, "dealers"), orderBy("name", "asc"), limit(max));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   });
 }
 

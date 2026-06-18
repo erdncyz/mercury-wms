@@ -82,6 +82,8 @@ service cloud.firestore {
           'type',
           'amount',
           'destination',
+          'dealerId',
+          'dealerName',
           'timestamp'
         ])
         && isNonEmptyString(data.productId, 128)
@@ -90,7 +92,32 @@ service cloud.firestore {
         && data.amount is number
         && data.amount > 0
         && (!data.keys().hasAny(['destination']) || isString(data.destination, 200))
+        && (!data.keys().hasAny(['dealerId']) || isString(data.dealerId, 128))
+        && (!data.keys().hasAny(['dealerName']) || isString(data.dealerName, 160))
         && data.timestamp is timestamp;
+    }
+
+    function isValidDealerData(data) {
+      return data.keys().hasOnly([
+          'name',
+          'code',
+          'contactName',
+          'phone',
+          'email',
+          'city',
+          'address',
+          'note',
+          'updatedAt'
+        ])
+        && isNonEmptyString(data.name, 160)
+        && (!data.keys().hasAny(['code']) || isString(data.code, 80))
+        && (!data.keys().hasAny(['contactName']) || isString(data.contactName, 120))
+        && (!data.keys().hasAny(['phone']) || isString(data.phone, 80))
+        && (!data.keys().hasAny(['email']) || isString(data.email, 160))
+        && (!data.keys().hasAny(['city']) || isString(data.city, 120))
+        && (!data.keys().hasAny(['address']) || isString(data.address, 300))
+        && (!data.keys().hasAny(['note']) || isString(data.note, 300))
+        && data.updatedAt is timestamp;
     }
 
     function isValidActivityLogData(data) {
@@ -104,6 +131,8 @@ service cloud.firestore {
           'stockType',
           'beforeStock',
           'afterStock',
+          'dealerId',
+          'dealerName',
           'warehouseFrom',
           'warehouseTo',
           'barcode',
@@ -126,6 +155,8 @@ service cloud.firestore {
         && (!data.keys().hasAny(['stockType']) || data.stockType == 'IN' || data.stockType == 'OUT' || data.stockType == '')
         && (!data.keys().hasAny(['beforeStock']) || data.beforeStock is number)
         && (!data.keys().hasAny(['afterStock']) || data.afterStock is number)
+        && (!data.keys().hasAny(['dealerId']) || isString(data.dealerId, 128))
+        && (!data.keys().hasAny(['dealerName']) || isString(data.dealerName, 160))
         && (!data.keys().hasAny(['warehouseFrom']) || isString(data.warehouseFrom, 120))
         && (!data.keys().hasAny(['warehouseTo']) || isString(data.warehouseTo, 120))
         && (!data.keys().hasAny(['barcode']) || isString(data.barcode, 120))
@@ -147,6 +178,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidStockLogData(request.resource.data);
       allow update, delete: if false;
+    }
+
+    match /dealers/{dealerId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidDealerData(request.resource.data);
+      allow update: if isSignedIn() && isValidDealerData(request.resource.data);
+      allow delete: if isSignedIn();
     }
 
     match /activity_logs/{logId} {

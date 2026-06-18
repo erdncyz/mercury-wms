@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { applyStockChange, createProduct, findProductByBarcode, uploadProductRefImage } from "../services/stockService";
+import { applyStockChange, createDealer, createProduct, findProductByBarcode, subscribeDealers, uploadProductRefImage } from "../services/stockService";
 
 const SUPPORTED_SCAN_FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
@@ -79,6 +79,18 @@ function emptyProduct() {
   };
 }
 
+function emptyDealer() {
+  return {
+    name: "",
+    code: "",
+    contactName: "",
+    phone: "",
+    city: "",
+    address: "",
+    note: ""
+  };
+}
+
 function toNumberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(String(value).replace(",", "."));
@@ -148,6 +160,12 @@ export default function ScannerScreen({ t }) {
   const [product, setProduct] = useState(null);
   const [amount, setAmount] = useState(1);
   const [destination, setDestination] = useState("");
+  const [dealers, setDealers] = useState([]);
+  const [selectedDealerId, setSelectedDealerId] = useState("");
+  const [dealerForm, setDealerForm] = useState(emptyDealer());
+  const [dealerBusy, setDealerBusy] = useState(false);
+  const [dealerMessage, setDealerMessage] = useState("");
+  const [dealerError, setDealerError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -308,6 +326,13 @@ export default function ScannerScreen({ t }) {
   }, [loadCameras]);
 
   useEffect(() => {
+    const unsub = subscribeDealers((rows) => {
+      setDealers(rows);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     if (isScanning) {
       setError("");
     }
@@ -328,6 +353,7 @@ export default function ScannerScreen({ t }) {
     setProduct(null);
     setAmount(1);
     setDestination("");
+    setSelectedDealerId("");
     setError("");
     setMessage("");
     setNewProduct(emptyProduct());
@@ -418,6 +444,11 @@ export default function ScannerScreen({ t }) {
 
     if (!product) return;
 
+    const selectedDealer = dealers.find((item) => item.id === selectedDealerId) || null;
+    const resolvedDestination = type === "OUT"
+      ? (selectedDealer?.name || String(destination || "").trim())
+      : String(destination || "").trim();
+
     setError("");
     setMessage("");
     setIsStockUpdating(true);
@@ -428,7 +459,9 @@ export default function ScannerScreen({ t }) {
         productName: product.name,
         amount: parsed,
         type,
-        destination
+        destination: resolvedDestination,
+        dealerId: type === "OUT" ? String(selectedDealer?.id || "") : "",
+        dealerName: type === "OUT" ? String(selectedDealer?.name || "") : ""
       });
 
       setProduct((prev) => {
@@ -439,10 +472,37 @@ export default function ScannerScreen({ t }) {
 
       setMessage(t.actionDone);
       setDestination("");
+      setSelectedDealerId("");
     } catch (e) {
       setError(e.message === "Insufficient stock" ? t.notEnoughStock : t.saveError);
     } finally {
       setIsStockUpdating(false);
+    }
+  };
+
+  const onCreateDealer = async (event) => {
+    event.preventDefault();
+    if (dealerBusy) return;
+
+    const name = String(dealerForm.name || "").trim();
+    if (!name) {
+      setDealerError(t.dealerNameRequired);
+      return;
+    }
+
+    setDealerBusy(true);
+    setDealerError("");
+    setDealerMessage("");
+
+    try {
+      const created = await createDealer(dealerForm);
+      setDealerForm(emptyDealer());
+      setSelectedDealerId(created.id);
+      setDealerMessage(t.dealerCreateSuccess);
+    } catch (createError) {
+      setDealerError(mapSaveError(createError, t));
+    } finally {
+      setDealerBusy(false);
     }
   };
 
@@ -631,6 +691,91 @@ export default function ScannerScreen({ t }) {
               className="mt-1 w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-300"
             />
           </div>
+
+          <div className="mt-3">
+            <label className="text-sm text-slate-300">{t.dealerSelectLabel}</label>
+            <select
+              value={selectedDealerId}
+              onChange={(e) => {
+                const nextId = String(e.target.value || "");
+                setSelectedDealerId(nextId);
+                const selected = dealers.find((item) => item.id === nextId);
+                if (selected) {
+                  setDestination(String(selected.name || ""));
+                }
+              }}
+              className="mt-1 w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-300"
+            >
+              <option value="">{t.dealerSelectPlaceholder}</option>
+              {dealers.map((dealer) => (
+                <option key={dealer.id} value={dealer.id}>
+                  {dealer.name}{dealer.city ? ` - ${dealer.city}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <form onSubmit={onCreateDealer} className="mt-3 space-y-2 rounded-2xl border border-white/10 bg-slate-900/30 p-3">
+            <p className="text-xs font-semibold text-slate-300">{t.dealerAddTitle}</p>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input
+                value={dealerForm.name}
+                onChange={(e) => setDealerForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder={t.dealerName}
+                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+              />
+              <input
+                value={dealerForm.code}
+                onChange={(e) => setDealerForm((prev) => ({ ...prev, code: e.target.value }))}
+                placeholder={t.dealerCode}
+                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+              />
+              <input
+                value={dealerForm.contactName}
+                onChange={(e) => setDealerForm((prev) => ({ ...prev, contactName: e.target.value }))}
+                placeholder={t.dealerContactName}
+                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+              />
+              <input
+                value={dealerForm.phone}
+                onChange={(e) => setDealerForm((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder={t.dealerPhone}
+                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+              />
+              <input
+                value={dealerForm.city}
+                onChange={(e) => setDealerForm((prev) => ({ ...prev, city: e.target.value }))}
+                placeholder={t.dealerCity}
+                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+              />
+              <input
+                value={dealerForm.address}
+                onChange={(e) => setDealerForm((prev) => ({ ...prev, address: e.target.value }))}
+                placeholder={t.dealerAddress}
+                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+              />
+            </div>
+
+            <textarea
+              value={dealerForm.note}
+              onChange={(e) => setDealerForm((prev) => ({ ...prev, note: e.target.value }))}
+              placeholder={t.dealerNote}
+              rows={2}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+            />
+
+            <button
+              type="submit"
+              disabled={dealerBusy}
+              className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-200 disabled:opacity-60"
+            >
+              {dealerBusy ? t.loading : t.dealerAddButton}
+            </button>
+
+            {dealerMessage ? <p className="text-xs text-emerald-300">{dealerMessage}</p> : null}
+            {dealerError ? <p className="text-xs text-rose-300">{dealerError}</p> : null}
+          </form>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <button
