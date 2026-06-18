@@ -28,6 +28,24 @@ function formatDateTime(date) {
   });
 }
 
+function formatStockChange(log) {
+  const type = String(log.stockType || "").toUpperCase();
+  const amount = Number(log.amount || 0);
+  if (!Number.isFinite(amount) || amount === 0) return "-";
+  const sign = type === "OUT" || log.action === "stock_out" ? "-" : "+";
+  return `${sign}${Math.abs(amount)}`;
+}
+
+function getSummaryText(log, actionLabel) {
+  const summary = String(log.summary || "").trim();
+  if (summary) return summary;
+  if (log.action === "stock_in" || log.action === "stock_out") {
+    const change = formatStockChange(log);
+    return `${actionLabel} ${change !== "-" ? `(${change})` : ""}`.trim();
+  }
+  return actionLabel;
+}
+
 export default function ActivityLogScreen({ t }) {
   const [logs, setLogs] = useState([]);
   const [search, setSearch] = useState("");
@@ -57,7 +75,22 @@ export default function ActivityLogScreen({ t }) {
       if (!q) return true;
       const name = String(log.productName || "").toLocaleLowerCase("tr");
       const user = String(log.userName || "").toLocaleLowerCase("tr");
-      return name.includes(q) || user.includes(q);
+      const destination = String(log.destination || "").toLocaleLowerCase("tr");
+      const summary = String(log.summary || "").toLocaleLowerCase("tr");
+      const source = String(log.source || "").toLocaleLowerCase("tr");
+      const warehouseFrom = String(log.warehouseFrom || "").toLocaleLowerCase("tr");
+      const warehouseTo = String(log.warehouseTo || "").toLocaleLowerCase("tr");
+      const changedFields = Array.isArray(log.changedFields)
+        ? log.changedFields.join(" ").toLocaleLowerCase("tr")
+        : "";
+      return name.includes(q)
+        || user.includes(q)
+        || destination.includes(q)
+        || summary.includes(q)
+        || source.includes(q)
+        || warehouseFrom.includes(q)
+        || warehouseTo.includes(q)
+        || changedFields.includes(q);
     });
   }, [logs, search, actionFilter]);
 
@@ -65,8 +98,19 @@ export default function ActivityLogScreen({ t }) {
     if (filtered.length === 0) return;
     const data = filtered.map((log) => ({
       [t.activityTitle]: actionLabels[log.action] || log.action,
+      [t.activitySummary]: getSummaryText(log, actionLabels[log.action] || log.action),
       [t.productName]: log.productName || "-",
       [t.columnStock]: log.amount || 0,
+      [t.activityStockBefore]: Number.isFinite(Number(log.beforeStock)) ? Number(log.beforeStock) : "-",
+      [t.activityStockAfter]: Number.isFinite(Number(log.afterStock)) ? Number(log.afterStock) : "-",
+      [t.activityStockType]: log.stockType || "-",
+      [t.activityDestination]: log.destination || "-",
+      [t.activityWarehouseFrom]: log.warehouseFrom || "-",
+      [t.activityWarehouseTo]: log.warehouseTo || "-",
+      [t.activitySource]: log.source || "-",
+      [t.activityChangedFields]: Array.isArray(log.changedFields) && log.changedFields.length > 0 ? log.changedFields.join(", ") : "-",
+      [t.barcode]: log.barcode || "-",
+      [t.activityProductId]: log.productId || "-",
       [t.activityUser]: log.userName || t.activityUnknownUser,
       Tarih: formatDateTime(toDate(log.timestamp))
     }));
@@ -129,11 +173,14 @@ export default function ActivityLogScreen({ t }) {
             const badgeStyle = ACTION_STYLES[log.action] || "border-white/15 bg-slate-900/40 text-slate-200";
             const isStock = log.action === "stock_in" || log.action === "stock_out";
             const sign = log.action === "stock_in" ? "+" : log.action === "stock_out" ? "-" : "";
+            const actionLabel = actionLabels[log.action] || log.action;
+            const summaryText = getSummaryText(log, actionLabel);
+            const changedFields = Array.isArray(log.changedFields) ? log.changedFields.filter(Boolean) : [];
             return (
               <div key={log.id} className="glass rounded-2xl p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${badgeStyle}`}>
-                    {actionLabels[log.action] || log.action}
+                    {actionLabel}
                   </span>
                   {isStock && log.amount ? (
                     <span className="text-sm font-bold text-slate-100">{sign}{log.amount}</span>
@@ -143,9 +190,50 @@ export default function ActivityLogScreen({ t }) {
 
                 <p className="mt-2 break-words font-semibold text-slate-100">{log.productName || "-"}</p>
 
+                <p className="mt-1 text-xs text-cyan-200 break-words">{summaryText}</p>
+
                 <p className="mt-1 text-xs text-slate-400">
                   {t.activityUser}: <span className="text-slate-200">{log.userName || t.activityUnknownUser}</span>
                 </p>
+
+                <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-slate-400 sm:grid-cols-2">
+                  {Number.isFinite(Number(log.beforeStock)) ? (
+                    <p>{t.activityStockBefore}: <span className="text-slate-200">{Number(log.beforeStock)}</span></p>
+                  ) : null}
+                  {Number.isFinite(Number(log.afterStock)) ? (
+                    <p>{t.activityStockAfter}: <span className="text-slate-200">{Number(log.afterStock)}</span></p>
+                  ) : null}
+                  {log.stockType ? (
+                    <p>{t.activityStockType}: <span className="text-slate-200">{log.stockType}</span></p>
+                  ) : null}
+                  {log.source ? (
+                    <p>{t.activitySource}: <span className="text-slate-200 break-all">{log.source}</span></p>
+                  ) : null}
+                  {log.warehouseFrom ? (
+                    <p>{t.activityWarehouseFrom}: <span className="text-slate-200 break-words">{log.warehouseFrom}</span></p>
+                  ) : null}
+                  {log.warehouseTo ? (
+                    <p>{t.activityWarehouseTo}: <span className="text-slate-200 break-words">{log.warehouseTo}</span></p>
+                  ) : null}
+                  {log.barcode ? (
+                    <p>{t.barcode}: <span className="text-slate-200 break-all">{log.barcode}</span></p>
+                  ) : null}
+                  {log.productId ? (
+                    <p>{t.activityProductId}: <span className="text-slate-200 break-all">{log.productId}</span></p>
+                  ) : null}
+                </div>
+
+                {log.destination ? (
+                  <p className="mt-1 text-xs text-slate-400">
+                    {t.activityDestination}: <span className="text-slate-200 break-words">{log.destination}</span>
+                  </p>
+                ) : null}
+
+                {changedFields.length > 0 ? (
+                  <p className="mt-1 text-xs text-slate-400">
+                    {t.activityChangedFields}: <span className="text-slate-200 break-words">{changedFields.join(", ")}</span>
+                  </p>
+                ) : null}
               </div>
             );
           })

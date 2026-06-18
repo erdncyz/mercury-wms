@@ -147,6 +147,7 @@ export default function ScannerScreen({ t }) {
   const [scannedCode, setScannedCode] = useState("");
   const [product, setProduct] = useState(null);
   const [amount, setAmount] = useState(1);
+  const [destination, setDestination] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -326,6 +327,7 @@ export default function ScannerScreen({ t }) {
     setManualBarcode("");
     setProduct(null);
     setAmount(1);
+    setDestination("");
     setError("");
     setMessage("");
     setNewProduct(emptyProduct());
@@ -425,7 +427,8 @@ export default function ScannerScreen({ t }) {
         productId: product.id,
         productName: product.name,
         amount: parsed,
-        type
+        type,
+        destination
       });
 
       setProduct((prev) => {
@@ -435,6 +438,7 @@ export default function ScannerScreen({ t }) {
       });
 
       setMessage(t.actionDone);
+      setDestination("");
     } catch (e) {
       setError(e.message === "Insufficient stock" ? t.notEnoughStock : t.saveError);
     } finally {
@@ -615,6 +619,16 @@ export default function ScannerScreen({ t }) {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="mt-1 w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-4 text-lg outline-none focus:border-cyan-300"
+            />
+          </div>
+
+          <div className="mt-3">
+            <label className="text-sm text-slate-300">{t.stockDestination}</label>
+            <input
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              placeholder={t.stockDestinationPlaceholder}
+              className="mt-1 w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-300"
             />
           </div>
 

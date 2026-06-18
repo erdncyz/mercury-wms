@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  getDoc,
   updateDoc,
   getDocs,
   limit,
@@ -24,14 +25,115 @@ function getActor() {
   };
 }
 
-async function logActivity({ action, productId, productName, amount = 0 }) {
+function toSafeNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function sanitizeChangedFields(fields) {
+  if (!Array.isArray(fields)) return [];
+  return fields
+    .map((field) => String(field || "").trim())
+    .filter((field) => Boolean(field))
+    .slice(0, 30);
+}
+
+function buildActivitySummary(payload) {
+  const {
+    action,
+    amount,
+    stockType,
+    beforeStock,
+    afterStock,
+    destination,
+    warehouseFrom,
+    warehouseTo,
+    changedFields
+  } = payload;
+
+  const absAmount = Math.abs(toSafeNumber(amount, 0));
+  const hasBeforeAfter = Number.isFinite(Number(beforeStock)) && Number.isFinite(Number(afterStock));
+
+  if (action === "stock_in" || action === "stock_out") {
+    const op = stockType === "OUT" || action === "stock_out" ? "Stok dusuruldu" : "Stok artirildi";
+    const base = absAmount > 0 ? `${op}: ${absAmount}` : op;
+    const stockTrail = hasBeforeAfter ? ` (${beforeStock} -> ${afterStock})` : "";
+
+    if (warehouseFrom && warehouseTo) {
+      return `${base}${stockTrail} | ${warehouseFrom} -> ${warehouseTo}`;
+    }
+    if (warehouseTo) {
+      return `${base}${stockTrail} | Hedef: ${warehouseTo}`;
+    }
+    if (destination) {
+      return `${base}${stockTrail} | Gonderim: ${destination}`;
+    }
+    return `${base}${stockTrail}`;
+  }
+
+  if (action === "create") {
+    return "Yeni urun kaydi olusturuldu";
+  }
+
+  if (action === "update") {
+    if (Array.isArray(changedFields) && changedFields.length > 0) {
+      return `Urun guncellendi: ${changedFields.join(", ")}`;
+    }
+    return "Urun guncellendi";
+  }
+
+  if (action === "delete") {
+    return "Urun silindi";
+  }
+
+  return "Islem kaydi";
+}
+
+async function logActivity({
+  action,
+  productId,
+  productName,
+  amount = 0,
+  destination = "",
+  source = "",
+  stockType = "",
+  beforeStock = null,
+  afterStock = null,
+  warehouseFrom = "",
+  warehouseTo = "",
+  barcode = "",
+  changedFields = []
+}) {
   try {
     const actor = getActor();
+    const cleanedChangedFields = sanitizeChangedFields(changedFields);
+    const summary = buildActivitySummary({
+      action,
+      amount,
+      stockType,
+      beforeStock,
+      afterStock,
+      destination,
+      warehouseFrom,
+      warehouseTo,
+      changedFields: cleanedChangedFields
+    });
+
     await addDoc(collection(db, "activity_logs"), {
       action,
       productId: String(productId || ""),
       productName: String(productName || "").trim().slice(0, 200) || "-",
       amount: Number.isFinite(Number(amount)) ? Number(amount) : 0,
+      destination: String(destination || "").trim().slice(0, 200),
+      source: String(source || "").trim().slice(0, 80),
+      stockType: String(stockType || "").trim().toUpperCase().slice(0, 8),
+      beforeStock: Number.isFinite(Number(beforeStock)) ? Number(beforeStock) : null,
+      afterStock: Number.isFinite(Number(afterStock)) ? Number(afterStock) : null,
+      warehouseFrom: String(warehouseFrom || "").trim().slice(0, 120),
+      warehouseTo: String(warehouseTo || "").trim().slice(0, 120),
+      barcode: String(barcode || "").trim().slice(0, 120),
+      changedFields: cleanedChangedFields,
+      summary,
       userId: actor.userId,
       userName: actor.userName,
       timestamp: serverTimestamp()
@@ -105,7 +207,7 @@ export async function findExistingProduct({ barcode }) {
   return null;
 }
 
-export async function createProduct(payload) {
+export async function createProduct(payload, options = {}) {
   const details = payload.details && typeof payload.details === "object" ? payload.details : {};
   const normalizedBarcode = String(payload.barcode || "").trim();
   const normalizedName = String(payload.name || "").trim();
@@ -113,6 +215,7 @@ export async function createProduct(payload) {
   const normalizedImageUrl = String(payload.imageUrl || "").trim();
   const incomingQty = Number(payload.quantity || 0);
   const incomingPrice = Number(payload.price || 0);
+  const source = String(options?.source || "").trim();
 
   const existing = await findExistingProduct({ barcode: normalizedBarcode });
 
@@ -146,7 +249,8 @@ export async function createProduct(payload) {
         action: "stock_in",
         productId: existing.id,
         productName: normalizedName || existing.name,
-        amount: incomingQty
+        amount: incomingQty,
+        source: source || "create_merge"
       });
     }
 
@@ -180,7 +284,11 @@ export async function createProduct(payload) {
     action: "create",
     productId: productRef.id,
     productName: normalizedName,
-    amount: incomingQty
+    amount: incomingQty,
+    source: source || "create_product",
+    barcode: normalizedBarcode,
+    warehouseTo: String(details?.warehouseLocation || "").trim(),
+    afterStock: toSafeNumber(details?.totalProductCount, Math.max(0, incomingQty))
   });
 
   return {
@@ -202,6 +310,9 @@ export async function uploadProductRefImage(file, productId) {
 
 export async function updateProduct(productId, payload) {
   const productRef = doc(db, "products", productId);
+  const prevSnap = await getDoc(productRef);
+  const prevData = prevSnap.exists() ? prevSnap.data() : null;
+
   const nextData = {
     name: String(payload.name || "").trim(),
     barcode: String(payload.barcode || "").trim(),
@@ -215,20 +326,49 @@ export async function updateProduct(productId, payload) {
 
   await updateDoc(productRef, nextData);
 
+  const changedFields = [];
+  if (prevData) {
+    if (String(prevData.name || "") !== nextData.name) changedFields.push("name");
+    if (String(prevData.barcode || "") !== nextData.barcode) changedFields.push("barcode");
+    if (String(prevData.category || "") !== nextData.category) changedFields.push("category");
+    if (toSafeNumber(prevData.quantity, 0) !== toSafeNumber(nextData.quantity, 0)) changedFields.push("quantity");
+    if (toSafeNumber(prevData.price, 0) !== toSafeNumber(nextData.price, 0)) changedFields.push("price");
+    if (String(prevData.imageUrl || "") !== nextData.imageUrl) changedFields.push("imageUrl");
+
+    const prevDetails = prevData.details && typeof prevData.details === "object" ? prevData.details : {};
+    const nextDetails = nextData.details && typeof nextData.details === "object" ? nextData.details : {};
+    const detailKeys = new Set([...Object.keys(prevDetails), ...Object.keys(nextDetails)]);
+    detailKeys.forEach((key) => {
+      if (String(prevDetails[key] ?? "") !== String(nextDetails[key] ?? "")) {
+        changedFields.push(`details.${key}`);
+      }
+    });
+  }
+
   await logActivity({
     action: "update",
     productId,
-    productName: nextData.name
+    productName: nextData.name,
+    source: "inventory_edit",
+    barcode: nextData.barcode,
+    changedFields
   });
 }
 
 export async function deleteProduct(productId, productName) {
-  await deleteDoc(doc(db, "products", productId));
+  const productRef = doc(db, "products", productId);
+  const beforeSnap = await getDoc(productRef);
+  const beforeData = beforeSnap.exists() ? beforeSnap.data() : null;
+  await deleteDoc(productRef);
 
   await logActivity({
     action: "delete",
     productId,
-    productName
+    productName,
+    source: "inventory_delete",
+    barcode: String(beforeData?.barcode || "").trim(),
+    warehouseFrom: String(beforeData?.details?.warehouseLocation || "").trim(),
+    beforeStock: toSafeNumber(beforeData?.details?.totalProductCount, null)
   });
 }
 
@@ -249,14 +389,20 @@ export async function deleteProductsBulk(products) {
     await logActivity({
       action: "delete",
       productId: item.id,
-      productName: item.name
+      productName: item.name,
+      source: "bulk_delete"
     });
   }
 }
 
-export async function applyStockChange({ productId, productName, amount, type }) {
+export async function applyStockChange({ productId, productName, amount, type, destination = "" }) {
   const productDoc = doc(db, "products", productId);
   const parsedAmount = Number(amount);
+  const normalizedDestination = String(destination || "").trim().slice(0, 200);
+  let beforeStock = 0;
+  let afterStock = 0;
+  let warehouse = "";
+  let barcode = "";
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(productDoc);
@@ -265,6 +411,11 @@ export async function applyStockChange({ productId, productName, amount, type })
     const data = snap.data();
     const currentCount = Number(data.details?.totalProductCount || 0);
     const nextCount = type === "IN" ? currentCount + parsedAmount : currentCount - parsedAmount;
+
+    beforeStock = currentCount;
+    afterStock = nextCount;
+    warehouse = String(data.details?.warehouseLocation || "").trim();
+    barcode = String(data.barcode || "").trim();
 
     if (nextCount < 0) {
       throw new Error("Insufficient stock");
@@ -283,6 +434,7 @@ export async function applyStockChange({ productId, productName, amount, type })
     productName,
     type,
     amount: parsedAmount,
+    destination: normalizedDestination,
     timestamp: serverTimestamp()
   });
 
@@ -290,7 +442,15 @@ export async function applyStockChange({ productId, productName, amount, type })
     action: type === "IN" ? "stock_in" : "stock_out",
     productId,
     productName,
-    amount: parsedAmount
+    amount: parsedAmount,
+    destination: normalizedDestination,
+    source: "scanner_stock_action",
+    stockType: type,
+    beforeStock,
+    afterStock,
+    warehouseFrom: warehouse,
+    warehouseTo: type === "IN" ? warehouse : normalizedDestination,
+    barcode
   });
 }
 
@@ -306,6 +466,13 @@ export async function transferStock({ sourceProduct, amount, targetWarehouse, ta
 
   const sourceRef = doc(db, "products", sourceProduct.id);
   let targetLogId = targetProductId || "";
+  let sourceBefore = 0;
+  let sourceAfter = 0;
+  let targetBefore = 0;
+  let targetAfter = 0;
+  let sourceWarehouse = String(sourceProduct.details?.warehouseLocation || "").trim();
+  let targetWarehouseName = targetWh;
+  let sourceBarcode = String(sourceProduct.barcode || "").trim();
 
   await runTransaction(db, async (tx) => {
     const sourceSnap = await tx.get(sourceRef);
@@ -314,6 +481,10 @@ export async function transferStock({ sourceProduct, amount, targetWarehouse, ta
     const sourceData = sourceSnap.data();
     const sourceCount = Number(sourceData.details?.totalProductCount || 0);
     if (parsedAmount > sourceCount) throw new Error("Insufficient stock");
+    sourceBefore = sourceCount;
+    sourceAfter = sourceCount - parsedAmount;
+    sourceWarehouse = String(sourceData.details?.warehouseLocation || "").trim();
+    sourceBarcode = String(sourceData.barcode || "").trim();
 
     let targetRef = null;
     let targetSnap = null;
@@ -330,6 +501,9 @@ export async function transferStock({ sourceProduct, amount, targetWarehouse, ta
     if (targetRef && targetSnap?.exists()) {
       const targetData = targetSnap.data();
       const targetCount = Number(targetData.details?.totalProductCount || 0);
+      targetBefore = targetCount;
+      targetAfter = targetCount + parsedAmount;
+      targetWarehouseName = String(targetData.details?.warehouseLocation || targetWh).trim();
       tx.update(targetRef, {
         details: { ...(targetData.details || {}), totalProductCount: targetCount + parsedAmount },
         updatedAt: serverTimestamp()
@@ -338,6 +512,9 @@ export async function transferStock({ sourceProduct, amount, targetWarehouse, ta
       const newRef = doc(collection(db, "products"));
       targetLogId = newRef.id;
       const srcDetails = sourceData.details || {};
+      targetBefore = 0;
+      targetAfter = parsedAmount;
+      targetWarehouseName = targetWh;
       tx.set(newRef, {
         name: String(sourceData.name || "-").trim() || "-",
         barcode: String(sourceData.barcode || "").trim(),
@@ -359,14 +536,29 @@ export async function transferStock({ sourceProduct, amount, targetWarehouse, ta
     action: "stock_out",
     productId: sourceProduct.id,
     productName: sourceProduct.name,
-    amount: parsedAmount
+    amount: parsedAmount,
+    source: "warehouse_transfer",
+    stockType: "OUT",
+    beforeStock: sourceBefore,
+    afterStock: sourceAfter,
+    destination: targetWh,
+    warehouseFrom: sourceWarehouse,
+    warehouseTo: targetWarehouseName,
+    barcode: sourceBarcode
   });
 
   await logActivity({
     action: "stock_in",
     productId: targetLogId,
     productName: sourceProduct.name,
-    amount: parsedAmount
+    amount: parsedAmount,
+    source: "warehouse_transfer",
+    stockType: "IN",
+    beforeStock: targetBefore,
+    afterStock: targetAfter,
+    warehouseFrom: sourceWarehouse,
+    warehouseTo: targetWarehouseName,
+    barcode: sourceBarcode
   });
 }
 
@@ -428,7 +620,7 @@ export async function importProductsBulk(rawRows, onProgress) {
       const existing = await findExistingProduct({ barcode: row.barcode });
 
       if (!existing) {
-        await createProduct(row);
+        await createProduct(row, { source: "import" });
         result.created += 1;
         continue;
       }
@@ -464,7 +656,12 @@ export async function importProductsBulk(rawRows, onProgress) {
           action: "stock_in",
           productId: existing.id,
           productName: row.name,
-          amount: incomingQty
+          amount: incomingQty,
+          source: "import",
+          stockType: "IN",
+          beforeStock: currentQty,
+          afterStock: nextQty,
+          barcode: row.barcode
         });
       }
 
