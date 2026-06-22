@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "rea
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
 import * as XLSX from "xlsx";
-import { createProduct, deleteProduct, deleteProductsBulk, subscribeProducts, transferStock, updateProduct, uploadProductRefImage } from "../services/stockService";
+import { applyStockChange, createProduct, deleteProduct, deleteProductsBulk, subscribeDealers, subscribeProducts, transferStock, updateProduct, uploadProductRefImage } from "../services/stockService";
 
 const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "warehouseLocation", "features", "imageRef"];
 const OPTIONAL_NUMERIC_FIELDS = ["totalProductCount", "unitKg", "totalKg", "widthCm", "lengthCm", "heightCm", "unitM3", "totalM3"];
@@ -134,6 +134,10 @@ export default function InventoryScreen({ t }) {
   const [pendingBulkDelete, setPendingBulkDelete] = useState(false);
   const [transferAmount, setTransferAmount] = useState("");
   const [transferTarget, setTransferTarget] = useState("");
+  const [stockOutAmount, setStockOutAmount] = useState("");
+  const [stockOutDestination, setStockOutDestination] = useState("");
+  const [stockOutDealerId, setStockOutDealerId] = useState("");
+  const [dealers, setDealers] = useState([]);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [refImageFile, setRefImageFile] = useState(null);
@@ -163,6 +167,11 @@ export default function InventoryScreen({ t }) {
 
   useEffect(() => {
     const unsub = subscribeProducts((rows) => setProducts(rows));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeDealers((rows) => setDealers(rows));
     return () => unsub();
   }, []);
 
@@ -320,6 +329,9 @@ export default function InventoryScreen({ t }) {
     setRefImageFile(null);
     setTransferAmount("");
     setTransferTarget("");
+    setStockOutAmount("");
+    setStockOutDestination("");
+    setStockOutDealerId("");
     setEditing(emptyEditableProduct());
     setScannerTarget("");
     setScanError("");
@@ -331,6 +343,9 @@ export default function InventoryScreen({ t }) {
     setRefImageFile(null);
     setTransferAmount("");
     setTransferTarget("");
+    setStockOutAmount("");
+    setStockOutDestination("");
+    setStockOutDealerId("");
     setEditing({
       id: product.id,
       name: product.name || "",
@@ -590,6 +605,9 @@ export default function InventoryScreen({ t }) {
     setEditing(null);
     setRefImageFile(null);
     setScanError("");
+    setStockOutAmount("");
+    setStockOutDestination("");
+    setStockOutDealerId("");
   }, [stopInlineScanner]);
 
   useEffect(() => {
@@ -742,6 +760,56 @@ export default function InventoryScreen({ t }) {
 
     const date = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(workbook, `mercury-wms-stok-${date}.xlsx`);
+  };
+
+  const onReduceStock = async () => {
+    if (!editing?.id) return;
+
+    const amount = Math.floor(Number(stockOutAmount));
+    const currentStock = Number(editing.details?.totalProductCount || 0);
+
+    setError("");
+    setMessage("");
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError(t.invalidAmount);
+      return;
+    }
+    if (amount > currentStock) {
+      setError(t.notEnoughStock);
+      return;
+    }
+
+    const selectedDealer = dealers.find((item) => item.id === stockOutDealerId) || null;
+    const resolvedDestination = selectedDealer?.name || String(stockOutDestination || "").trim();
+
+    setBusy(true);
+    try {
+      await applyStockChange({
+        productId: editing.id,
+        productName: editing.name,
+        amount,
+        type: "OUT",
+        destination: resolvedDestination,
+        dealerId: String(selectedDealer?.id || ""),
+        dealerName: String(selectedDealer?.name || "")
+      });
+
+      setMessage(t.actionDone);
+      setStockOutAmount("");
+      setStockOutDestination("");
+      setStockOutDealerId("");
+      await closeEditModal();
+    } catch (stockError) {
+      const msg = String(stockError?.message || "");
+      if (msg.includes("Insufficient")) {
+        setError(t.notEnoughStock);
+      } else {
+        setError(t.saveError);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onTransferStock = async () => {
@@ -1640,6 +1708,72 @@ export default function InventoryScreen({ t }) {
                   className="w-full rounded-xl border border-amber-300/35 bg-amber-300/10 px-3 py-2 text-sm font-bold text-amber-200 disabled:opacity-50"
                 >
                   {t.transferButton}
+                </button>
+              </div>
+            ) : null}
+
+            {!isCreating ? (
+              <div className="rounded-2xl border border-rose-400/20 bg-rose-400/5 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-rose-200">{t.stockOutTitle}</p>
+                  <span className="text-[11px] text-slate-400">
+                    {t.transferCurrentStock.replace("{count}", String(editing.details?.totalProductCount ?? 0))}
+                  </span>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.amount}</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={stockOutAmount}
+                      onChange={(e) => setStockOutAmount(e.target.value)}
+                      placeholder={t.amount}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-rose-300"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] text-slate-400">{t.dealerSelectLabel}</span>
+                    <select
+                      value={stockOutDealerId}
+                      onChange={(e) => {
+                        const nextId = String(e.target.value || "");
+                        setStockOutDealerId(nextId);
+                        const selected = dealers.find((item) => item.id === nextId);
+                        if (selected) {
+                          setStockOutDestination(String(selected.name || ""));
+                        }
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-rose-300"
+                    >
+                      <option value="">{t.dealerSelectPlaceholder}</option>
+                      {dealers.map((dealer) => (
+                        <option key={dealer.id} value={dealer.id}>
+                          {dealer.name}{dealer.city ? ` - ${dealer.city}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <label className="block space-y-1">
+                  <span className="text-[11px] text-slate-400">{t.stockDestination}</span>
+                  <input
+                    value={stockOutDestination}
+                    onChange={(e) => setStockOutDestination(e.target.value)}
+                    placeholder={t.stockDestinationPlaceholder}
+                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-rose-300"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onReduceStock}
+                  className="w-full rounded-xl border border-rose-400/40 bg-rose-500/15 px-3 py-2 text-sm font-bold text-rose-200 disabled:opacity-50"
+                >
+                  {t.removeStock}
                 </button>
               </div>
             ) : null}
