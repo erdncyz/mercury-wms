@@ -38,6 +38,7 @@ export default function DealerManagementScreen({ t }) {
   const [pendingDelete, setPendingDelete] = useState(null);
   const [pendingReturn, setPendingReturn] = useState(null);
   const [returnAmount, setReturnAmount] = useState(1);
+  const [editedSalesAmount, setEditedSalesAmount] = useState(1);
 
   useEffect(() => {
     const unsub = subscribeDealers((rows) => {
@@ -267,13 +268,17 @@ export default function DealerManagementScreen({ t }) {
   const onReturnProduct = async () => {
     if (!pendingReturn || busy) return;
 
-    const amount = Math.floor(Number(returnAmount));
-    if (!Number.isFinite(amount) || amount <= 0) {
+    // Satılan miktarın değişmesinden kaynaklanan fark
+    const salesToRemove = Math.max(0, pendingReturn.qty - editedSalesAmount);
+    const additionalReturn = Math.floor(Number(returnAmount));
+    const totalAmount = salesToRemove + additionalReturn;
+
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
       setError(t.invalidAmount || "Geçersiz miktar");
       return;
     }
 
-    if (amount > pendingReturn.qty) {
+    if (totalAmount > pendingReturn.qty) {
       setError(t.notEnoughStock || "Satılan miktardan fazla iade edemezsiniz");
       return;
     }
@@ -294,7 +299,7 @@ export default function DealerManagementScreen({ t }) {
       await applyStockChange({
         productId: productId || "",
         productName: String(pendingReturn.name || "").trim(),
-        amount,
+        amount: totalAmount,
         type: "IN",
         destination: warehouseLocation,
         dealerId: String(pendingReturn.dealerId || ""),
@@ -304,6 +309,7 @@ export default function DealerManagementScreen({ t }) {
       setMessage(t.actionDone || "İade işlemi başarılı");
       setPendingReturn(null);
       setReturnAmount(1);
+      setEditedSalesAmount(1);
     } catch (returnError) {
       setError(returnError.message || t.saveError);
     } finally {
@@ -314,6 +320,7 @@ export default function DealerManagementScreen({ t }) {
   const onRemoveAllSales = async () => {
     if (!pendingReturn || busy) return;
 
+    // Tüm satış kaydını sil (orijinal qty kadar iade et)
     const amount = pendingReturn.qty;
 
     setBusy(true);
@@ -342,6 +349,7 @@ export default function DealerManagementScreen({ t }) {
       setMessage("Satış tamamen çıkarıldı ve stok geri alındı");
       setPendingReturn(null);
       setReturnAmount(1);
+      setEditedSalesAmount(1);
     } catch (returnError) {
       setError(returnError.message || t.saveError);
     } finally {
@@ -552,6 +560,7 @@ export default function DealerManagementScreen({ t }) {
                                           dealerName: dealer.name
                                         });
                                         setReturnAmount(1);
+                                        setEditedSalesAmount(item.qty);
                                       }}
                                       disabled={busy}
                                       className="rounded-lg border border-amber-300/35 bg-amber-300/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 hover:bg-amber-300/20 disabled:opacity-50"
@@ -661,9 +670,16 @@ export default function DealerManagementScreen({ t }) {
               <p className="text-sm text-slate-300">
                 Ürün: <span className="font-bold text-slate-100">{pendingReturn.name}</span>
               </p>
-              <p className="text-sm text-slate-300">
-                Satılan Miktarı: <span className="font-bold text-cyan-200">{pendingReturn.qty}</span>
-              </p>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-300">Satılan Miktarı:</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editedSalesAmount}
+                  onChange={(e) => setEditedSalesAmount(Number(e.target.value) || 1)}
+                  className="w-20 rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-2 py-1 text-sm font-bold text-cyan-200 outline-none focus:border-cyan-300"
+                />
+              </div>
               <p className="text-sm text-slate-300">
                 Depo: <span className="font-bold text-purple-300">
                   {(() => {
@@ -681,17 +697,17 @@ export default function DealerManagementScreen({ t }) {
                 <input
                   type="number"
                   min="1"
-                  max={pendingReturn.qty}
+                  max={Math.max(1, pendingReturn.qty - editedSalesAmount + Number(returnAmount))}
                   value={returnAmount}
                   onChange={(e) => setReturnAmount(e.target.value)}
                   className="flex-1 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-amber-300"
                 />
                 <button
                   type="button"
-                  onClick={() => setReturnAmount(String(pendingReturn.qty))}
+                  onClick={() => setReturnAmount(String(Math.max(0, pendingReturn.qty - editedSalesAmount)))}
                   disabled={busy}
                   className="rounded-xl border border-amber-300/35 bg-amber-300/10 px-2 py-2 text-xs font-bold text-amber-200 disabled:opacity-50"
-                  title="Tümünü seç"
+                  title="Farkı seç"
                 >
                   Tümü
                 </button>
