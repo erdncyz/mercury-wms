@@ -86,8 +86,8 @@ service cloud.firestore {
           'dealerName',
           'timestamp'
         ])
-        && isNonEmptyString(data.productId, 128)
-        && isNonEmptyString(data.productName, 120)
+        && (!data.keys().hasAny(['productId']) || isString(data.productId, 128))
+        && (!data.keys().hasAny(['productName']) || isString(data.productName, 120))
         && (data.type == 'IN' || data.type == 'OUT')
         && data.amount is number
         && data.amount > 0
@@ -147,8 +147,8 @@ service cloud.firestore {
           || data.action == 'delete'
           || data.action == 'stock_in'
           || data.action == 'stock_out')
-        && isString(data.productId, 128)
-        && isNonEmptyString(data.productName, 200)
+        && (!data.keys().hasAny(['productId']) || isString(data.productId, 128))
+        && (!data.keys().hasAny(['productName']) || isString(data.productName, 200))
         && data.amount is number
         && (!data.keys().hasAny(['destination']) || isString(data.destination, 200))
         && (!data.keys().hasAny(['source']) || isString(data.source, 80))
