@@ -421,7 +421,8 @@ export async function applyStockChange({
   dealerId = "",
   dealerName = ""
 }) {
-  const productDoc = doc(db, "products", productId);
+  const normalizedProductId = String(productId || "").trim();
+  const normalizedProductName = String(productName || "").trim();
   const parsedAmount = Number(amount);
   const normalizedDestination = String(destination || "").trim().slice(0, 200);
   const normalizedDealerId = String(dealerId || "").trim().slice(0, 128);
@@ -431,34 +432,39 @@ export async function applyStockChange({
   let warehouse = "";
   let barcode = "";
 
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(productDoc);
-    if (!snap.exists()) throw new Error("Product not found");
+  // Only update stock if productId is provided
+  if (normalizedProductId) {
+    const productDoc = doc(db, "products", normalizedProductId);
 
-    const data = snap.data();
-    const currentCount = Number(data.details?.totalProductCount || 0);
-    const nextCount = type === "IN" ? currentCount + parsedAmount : currentCount - parsedAmount;
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(productDoc);
+      if (!snap.exists()) throw new Error("Product not found");
 
-    beforeStock = currentCount;
-    afterStock = nextCount;
-    warehouse = String(data.details?.warehouseLocation || "").trim();
-    barcode = String(data.barcode || "").trim();
+      const data = snap.data();
+      const currentCount = Number(data.details?.totalProductCount || 0);
+      const nextCount = type === "IN" ? currentCount + parsedAmount : currentCount - parsedAmount;
 
-    if (nextCount < 0) {
-      throw new Error("Insufficient stock");
-    }
+      beforeStock = currentCount;
+      afterStock = nextCount;
+      warehouse = String(data.details?.warehouseLocation || "").trim();
+      barcode = String(data.barcode || "").trim();
 
-    const nextDetails = { ...(data.details || {}), totalProductCount: nextCount };
+      if (nextCount < 0) {
+        throw new Error("Insufficient stock");
+      }
 
-    tx.update(productDoc, {
-      details: nextDetails,
-      updatedAt: serverTimestamp()
+      const nextDetails = { ...(data.details || {}), totalProductCount: nextCount };
+
+      tx.update(productDoc, {
+        details: nextDetails,
+        updatedAt: serverTimestamp()
+      });
     });
-  });
+  }
 
   await addDoc(collection(db, "stock_logs"), {
-    productId,
-    productName,
+    productId: normalizedProductId,
+    productName: normalizedProductName,
     type,
     amount: parsedAmount,
     destination: normalizedDestination,
@@ -469,8 +475,8 @@ export async function applyStockChange({
 
   await logActivity({
     action: type === "IN" ? "stock_in" : "stock_out",
-    productId,
-    productName,
+    productId: normalizedProductId,
+    productName: normalizedProductName,
     amount: parsedAmount,
     destination: normalizedDestination,
     source: "scanner_stock_action",

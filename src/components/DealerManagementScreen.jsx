@@ -303,14 +303,15 @@ export default function DealerManagementScreen({ t }) {
     try {
       // Ürünün depo bilgisini al
       let warehouseLocation = "";
-      if (pendingReturn.productId) {
-        const product = products.find((p) => p.id === pendingReturn.productId);
+      const productId = String(pendingReturn.productId || "").trim();
+      if (productId) {
+        const product = products.find((p) => String(p.id || "").trim() === productId);
         warehouseLocation = String(product?.details?.warehouseLocation || "").trim();
       }
 
       await applyStockChange({
-        productId: pendingReturn.productId,
-        productName: pendingReturn.name,
+        productId: productId || "",
+        productName: String(pendingReturn.name || "").trim(),
         amount,
         type: "IN",
         destination: warehouseLocation,
@@ -340,14 +341,15 @@ export default function DealerManagementScreen({ t }) {
     try {
       // Ürünün depo bilgisini al
       let warehouseLocation = "";
-      if (pendingReturn.productId) {
-        const product = products.find((p) => p.id === pendingReturn.productId);
+      const productId = String(pendingReturn.productId || "").trim();
+      if (productId) {
+        const product = products.find((p) => String(p.id || "").trim() === productId);
         warehouseLocation = String(product?.details?.warehouseLocation || "").trim();
       }
 
       await applyStockChange({
-        productId: pendingReturn.productId,
-        productName: pendingReturn.name,
+        productId: productId || "",
+        productName: String(pendingReturn.name || "").trim(),
         amount,
         type: "IN",
         destination: warehouseLocation,
