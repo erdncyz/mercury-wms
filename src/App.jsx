@@ -84,6 +84,15 @@ export default function App() {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <a
+                href={CREATOR_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="creator-link hidden sm:inline-flex"
+              >
+                <HiOutlineSparkles size={15} className="creator-link-icon" />
+                Geliştiren Erdinç Yılmaz
+              </a>
               <button
                 type="button"
                 onClick={() => setLang((v) => (v === "tr" ? "en" : "tr"))}
@@ -127,7 +136,7 @@ export default function App() {
             href={CREATOR_URL}
             target="_blank"
             rel="noreferrer"
-            className="creator-link mt-3 inline-flex w-full justify-center sm:mt-2 sm:w-auto"
+            className="creator-link mt-3 inline-flex w-full justify-center sm:hidden"
           >
             <HiOutlineSparkles size={15} className="creator-link-icon" />
             Geliştiren Erdinç Yılmaz
