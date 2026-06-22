@@ -66,9 +66,7 @@ body::after {
 
 #root {
   position: relative;
-  isolation: isolate;
-  z-index: 0;
-  overflow-x: clip;
+  min-height: 100%;
 }
 
 .font-display {
