@@ -301,6 +301,24 @@ textarea::placeholder {
   box-shadow: 0 8px 18px rgba(8, 40, 64, 0.35);
 }
 
+/* Premium table */
+.premium-thead {
+  background: linear-gradient(180deg, rgba(28, 48, 80, 0.55), rgba(14, 26, 46, 0.35));
+}
+
+.premium-thead th {
+  position: relative;
+}
+
+.premium-row {
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.premium-row:hover {
+  background: linear-gradient(90deg, rgba(103, 227, 255, 0.07), rgba(124, 92, 255, 0.05));
+  box-shadow: inset 3px 0 0 rgba(103, 227, 255, 0.55);
+}
+
 .app-shell {
   position: relative;
 }

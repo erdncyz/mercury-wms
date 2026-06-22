@@ -1468,10 +1468,10 @@ export default function InventoryScreen({ t }) {
               })}
             </div>
 
-            <div className="glass hidden overflow-x-auto rounded-3xl sm:block sm:rounded-2xl">
+            <div className="premium-panel hidden overflow-x-auto rounded-3xl sm:block sm:rounded-2xl">
             <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                <tr className="premium-thead border-b border-white/10 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-300">
                   {bulkMode ? <th className="px-3 py-3 w-10" /> : null}
                   <th className="px-3 py-3">{t.columnProduct}</th>
                   <th className="px-3 py-3">{t.warehouseLocation}</th>
@@ -1513,7 +1513,7 @@ export default function InventoryScreen({ t }) {
 
                   return (
                     <Fragment key={p.id}>
-                      <tr className="border-b border-white/5 align-middle hover:bg-white/[0.03]">
+                      <tr className="premium-row border-b border-white/5 align-middle">
                         {bulkMode ? (
                           <td className="px-3 py-3">
                             <input
