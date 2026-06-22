@@ -51,9 +51,11 @@ export default function DealerManagementScreen({ t }) {
   }, []);
 
   // Bayi bazinda satilan urunleri (stok dusus islemleri) topla.
+  // OUT islemleri (satislar) topla, sonra IN islemleri (iadeler) cikar.
   const salesByDealer = useMemo(() => {
     const map = new Map();
 
+    // Adim 1: OUT islemleri (satislar) ekle
     salesLogs.forEach((log) => {
       const isStockOut = String(log.stockType || "").toUpperCase() === "OUT" || log.action === "stock_out";
       if (!isStockOut) return;
@@ -81,6 +83,37 @@ export default function DealerManagementScreen({ t }) {
         existing.qty += qty;
       } else {
         entry.products.set(productKey, { name: productName, qty });
+      }
+    });
+
+    // Adim 2: IN islemleri (iadeler) cikar
+    salesLogs.forEach((log) => {
+      const isStockIn = String(log.stockType || "").toUpperCase() === "IN" || log.action === "stock_in";
+      if (!isStockIn) return;
+
+      const dealerId = String(log.dealerId || "").trim();
+      const dealerName = String(log.dealerName || "").trim();
+      if (!dealerId && !dealerName) return;
+
+      const key = dealerId || `name:${dealerName.toLocaleLowerCase("tr")}`;
+      const qty = Math.abs(Number(log.amount || 0));
+      if (!Number.isFinite(qty) || qty <= 0) return;
+
+      const productName = String(log.productName || "-").trim() || "-";
+      const productKey = String(log.productId || productName);
+
+      let entry = map.get(key);
+      if (!entry) return; // Bu bayiye gelen IN varsa ama OUT yoksa, atliyoruz
+
+      entry.totalQty -= qty;
+      if (entry.totalQty < 0) entry.totalQty = 0;
+
+      const existing = entry.products.get(productKey);
+      if (existing) {
+        existing.qty -= qty;
+        if (existing.qty <= 0) {
+          entry.products.delete(productKey);
+        }
       }
     });
 

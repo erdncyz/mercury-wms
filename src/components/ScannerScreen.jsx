@@ -530,8 +530,8 @@ export default function ScannerScreen({ t }) {
         amount: parsed,
         type,
         destination: resolvedDestination,
-        dealerId: type === "OUT" ? String(selectedDealer?.id || "") : "",
-        dealerName: type === "OUT" ? String(selectedDealer?.name || "") : ""
+        dealerId: String(selectedDealer?.id || ""),
+        dealerName: String(selectedDealer?.name || "")
       });
 
       setProduct((prev) => {
