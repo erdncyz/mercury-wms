@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { HiOutlineCamera, HiOutlineXMark, HiOutlineMagnifyingGlass, HiOutlinePlus, HiOutlineTrash, HiOutlineArrowDownTray, HiOutlineBuildingStorefront, HiOutlineArrowsUpDown } from "react-icons/hi2";
+import { HiOutlineCamera, HiOutlineXMark, HiOutlineMagnifyingGlass, HiOutlinePlus, HiOutlineTrash, HiOutlineArrowDownTray, HiOutlineBuildingStorefront, HiOutlineArrowsUpDown, HiOutlinePencilSquare, HiOutlineChevronDown } from "react-icons/hi2";
 import * as XLSX from "xlsx";
 import { applyStockChange, createProduct, deleteProduct, deleteProductsBulk, subscribeActivityLogs, subscribeDealers, subscribeProducts, transferStock, updateProduct, uploadProductRefImage } from "../services/stockService";
 
@@ -1400,8 +1400,9 @@ export default function InventoryScreen({ t }) {
                       <button
                         type="button"
                         onClick={() => onToggleExpanded(p.id)}
-                        className="rounded-lg border border-cyan-300/20 bg-slate-950/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-cyan-200"
+                        className="details-pill inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-cyan-200"
                       >
+                        <HiOutlineChevronDown size={13} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                         {isExpanded ? t.hideDetails : t.showDetails}
                       </button>
 
@@ -1410,15 +1411,17 @@ export default function InventoryScreen({ t }) {
                           <button
                             type="button"
                             onClick={() => openEdit(p)}
-                            className="rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-200"
+                            className="action-pill action-pill-cyan inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-cyan-100"
                           >
+                            <HiOutlinePencilSquare size={15} />
                             {t.editProduct}
                           </button>
                           <button
                             type="button"
                             onClick={() => setPendingDelete(p)}
-                            className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-300"
+                            className="action-pill action-pill-rose inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-200"
                           >
+                            <HiOutlineTrash size={15} />
                             {t.deleteProduct}
                           </button>
                         </>
@@ -1563,8 +1566,9 @@ export default function InventoryScreen({ t }) {
                           <button
                             type="button"
                             onClick={() => onToggleExpanded(p.id)}
-                            className="rounded-lg border border-cyan-300/20 bg-slate-950/50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-cyan-200"
+                            className="details-pill inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-cyan-200"
                           >
+                            <HiOutlineChevronDown size={13} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                             {isExpanded ? t.hideDetails : t.showDetails}
                           </button>
                         </td>
@@ -1575,15 +1579,17 @@ export default function InventoryScreen({ t }) {
                               <button
                                 type="button"
                                 onClick={() => openEdit(p)}
-                                className="rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-3 py-1.5 text-sm font-semibold text-cyan-200"
+                                className="action-pill action-pill-cyan inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-cyan-100"
                               >
+                                <HiOutlinePencilSquare size={15} />
                                 {t.editProduct}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setPendingDelete(p)}
-                                className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-3 py-1.5 text-sm font-semibold text-rose-300"
+                                className="action-pill action-pill-rose inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-rose-200"
                               >
+                                <HiOutlineTrash size={15} />
                                 {t.deleteProduct}
                               </button>
                             </div>
