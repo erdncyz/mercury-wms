@@ -774,13 +774,20 @@ export default function InventoryScreen({ t }) {
 
     setBusy(true);
     try {
+      // Hedef depodaki "ayni urunu" once barkod ile esle (renk/varyant ayrimi barkodla yapilir),
+      // barkod yoksa urun koduna geri don. Bu sayede gri transferi siyaha eklenmez.
+      const sourceBarcode = String(editing.barcode || "").trim().toLowerCase();
       const productCode = String(editing.details?.productCode || "").trim().toLowerCase();
-      const targetProduct = products.find((p) => (
-        p.id !== editing.id
-        && String(p.details?.warehouseLocation || "").trim() === target
-        && productCode !== ""
-        && String(p.details?.productCode || "").trim().toLowerCase() === productCode
-      ));
+      const targetProduct = products.find((p) => {
+        if (p.id === editing.id) return false;
+        if (String(p.details?.warehouseLocation || "").trim() !== target) return false;
+
+        if (sourceBarcode) {
+          return String(p.barcode || "").trim().toLowerCase() === sourceBarcode;
+        }
+
+        return productCode !== "" && String(p.details?.productCode || "").trim().toLowerCase() === productCode;
+      });
 
       await transferStock({
         sourceProduct: { id: editing.id, name: editing.name },

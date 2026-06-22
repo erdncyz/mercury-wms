@@ -205,6 +205,14 @@ export async function findProductByBarcode(barcode) {
   return { id: item.id, ...item.data() };
 }
 
+export async function findProductsByBarcode(barcode) {
+  const normalized = String(barcode || "").trim();
+  if (!normalized) return [];
+  const q = query(collection(db, "products"), where("barcode", "==", normalized));
+  const snap = await getDocs(q);
+  return snap.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
 export async function findExistingProduct({ barcode }) {
   const normalizedBarcode = String(barcode || "").trim();
 

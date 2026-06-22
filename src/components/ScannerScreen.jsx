@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { applyStockChange, createDealer, createProduct, findProductByBarcode, subscribeDealers, uploadProductRefImage } from "../services/stockService";
+import { applyStockChange, createDealer, createProduct, findProductsByBarcode, subscribeDealers, uploadProductRefImage } from "../services/stockService";
 
 const SUPPORTED_SCAN_FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
@@ -159,6 +159,7 @@ export default function ScannerScreen({ t }) {
   const [scannedCode, setScannedCode] = useState("");
   const [product, setProduct] = useState(null);
   const [amount, setAmount] = useState(1);
+  const [stockWarehouse, setStockWarehouse] = useState("");
   const [destination, setDestination] = useState("");
   const [dealers, setDealers] = useState([]);
   const [selectedDealerId, setSelectedDealerId] = useState("");
@@ -183,6 +184,43 @@ export default function ScannerScreen({ t }) {
     setRefImageFile(pastedFile);
     setError("");
   }, []);
+
+  // Ayni barkod birden fazla depoda olabilir. Secili depoyu dikkate alarak dogru urunu bul.
+  const resolveScannedProduct = useCallback(async (barcode) => {
+    const matches = await findProductsByBarcode(barcode);
+
+    if (matches.length === 0) {
+      return { product: null, status: "notFound", warehouses: [] };
+    }
+
+    const wh = String(stockWarehouse || "").trim();
+    if (!wh) {
+      return { product: matches[0], status: "found", warehouses: [] };
+    }
+
+    const inWarehouse = matches.find(
+      (item) => String(item.details?.warehouseLocation || "").trim() === wh
+    );
+    if (inWarehouse) {
+      return { product: inWarehouse, status: "found", warehouses: [] };
+    }
+
+    const warehouses = [
+      ...new Set(
+        matches
+          .map((item) => String(item.details?.warehouseLocation || "").trim())
+          .filter(Boolean)
+      )
+    ];
+    return { product: null, status: "wrongWarehouse", warehouses };
+  }, [stockWarehouse]);
+
+  const buildWrongWarehouseMessage = useCallback((warehouses) => {
+    const list = warehouses.length > 0 ? warehouses.join(", ") : "-";
+    return t.scannerWrongWarehouse
+      .replace("{warehouse}", String(stockWarehouse || "").trim())
+      .replace("{list}", list);
+  }, [stockWarehouse, t]);
 
   const stopScan = useCallback(async () => {
     try {
@@ -282,18 +320,21 @@ export default function ScannerScreen({ t }) {
           playBeep();
 
           try {
-            const found = await findProductByBarcode(normalized);
+            const { product: found, status, warehouses } = await resolveScannedProduct(normalized);
 
             setProduct(found);
 
-            if (!found) {
+            if (status === "found") {
+              setManualMode(false);
+            } else if (status === "wrongWarehouse") {
+              setManualMode(false);
+              setError(buildWrongWarehouseMessage(warehouses));
+            } else {
               setManualMode(true);
               setNewProduct((prev) => ({
                 ...prev,
                 barcode: normalized
               }));
-            } else {
-              setManualMode(false);
             }
           } catch {
             setError(t.saveError);
@@ -319,7 +360,7 @@ export default function ScannerScreen({ t }) {
       setIsStarting(false);
       startLockRef.current = false;
     }
-  }, [loadCameras, manualMode, selectedCameraId, stopScan, t]);
+  }, [loadCameras, manualMode, selectedCameraId, stopScan, t, resolveScannedProduct, buildWrongWarehouseMessage]);
 
   useEffect(() => {
     loadCameras().catch(() => {});
@@ -419,14 +460,17 @@ export default function ScannerScreen({ t }) {
     setScannedCode(normalized);
 
     try {
-      const found = await findProductByBarcode(normalized);
+      const { product: found, status, warehouses } = await resolveScannedProduct(normalized);
       setProduct(found);
 
-      if (!found) {
+      if (status === "found") {
+        setManualMode(false);
+      } else if (status === "wrongWarehouse") {
+        setManualMode(false);
+        setError(buildWrongWarehouseMessage(warehouses));
+      } else {
         setManualMode(true);
         setNewProduct((prev) => ({ ...prev, barcode: normalized }));
-      } else {
-        setManualMode(false);
       }
     } catch {
       setError(t.saveError);
@@ -584,6 +628,20 @@ export default function ScannerScreen({ t }) {
           {t.scanAnyCode}
         </button>
 
+        <label className="mt-3 block space-y-1">
+          <span className="text-[11px] text-slate-400">{t.scannerStockWarehouse}</span>
+          <select
+            value={stockWarehouse}
+            onChange={(e) => setStockWarehouse(e.target.value)}
+            className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-cyan-300"
+          >
+            <option value="">{t.scannerStockWarehouseAll}</option>
+            <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
+            <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
+          </select>
+          <span className="block text-[10px] text-slate-500">{t.scannerStockWarehouseHint}</span>
+        </label>
+
         <form onSubmit={onManualBarcodeSubmit} className="mt-3 flex gap-2">
           <input
             value={manualBarcode}
@@ -667,6 +725,9 @@ export default function ScannerScreen({ t }) {
           <p className="text-sm text-cyan-300">{t.productFound}</p>
           <h3 className="mt-1 text-2xl font-bold">{product.name}</h3>
           <p className="mt-1 text-sm text-slate-400">{t.barcode}: {product.barcode}</p>
+          <p className="mt-1 text-sm text-slate-400">
+            {t.scannerProductWarehouse}: <span className="font-semibold text-slate-200">{String(product.details?.warehouseLocation || "").trim() || "-"}</span>
+          </p>
           <p className="mt-3 text-lg">
             {t.currentStock}: <span className="font-extrabold text-cyan-300">{Number(product.details?.totalProductCount || 0)}</span>
           </p>

@@ -239,7 +239,12 @@ export const labels = {
     transferInvalidAmount: "Gecerli bir adet girin",
     transferSameWarehouse: "Hedef depo mevcut depodan farkli olmali",
     transferInsufficient: "Yetersiz stok",
-    transferSuccess: "{amount} adet {warehouse} deposuna transfer edildi"
+    transferSuccess: "{amount} adet {warehouse} deposuna transfer edildi",
+    scannerStockWarehouse: "Islem Deposu",
+    scannerStockWarehouseAll: "Otomatik (ilk eslesme)",
+    scannerStockWarehouseHint: "Stok dusmeden once cikis yapacagin depoyu sec. Ayni barkod birden fazla depoda varsa secili depodaki urune islem yapilir.",
+    scannerProductWarehouse: "Depo",
+    scannerWrongWarehouse: "Bu barkod secili depoda ({warehouse}) bulunmuyor. Mevcut depo(lar): {list}"
   },
   en: {
     appName: "Mercury WMS",
@@ -481,6 +486,11 @@ export const labels = {
     transferInvalidAmount: "Enter a valid amount",
     transferSameWarehouse: "Target must differ from current warehouse",
     transferInsufficient: "Insufficient stock",
-    transferSuccess: "{amount} units transferred to {warehouse}"
+    transferSuccess: "{amount} units transferred to {warehouse}",
+    scannerStockWarehouse: "Operation Warehouse",
+    scannerStockWarehouseAll: "Automatic (first match)",
+    scannerStockWarehouseHint: "Select the warehouse to operate on before changing stock. If the same barcode exists in multiple warehouses, the item in the selected warehouse is used.",
+    scannerProductWarehouse: "Warehouse",
+    scannerWrongWarehouse: "This barcode is not in the selected warehouse ({warehouse}). Available in: {list}"
   }
 };
