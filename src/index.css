@@ -322,10 +322,12 @@ textarea::placeholder {
 
 .app-shell {
   position: relative;
+  background: linear-gradient(180deg, #060d18 0%, #091224 100%);
 }
 
 .topbar-shell {
   position: relative;
+  padding-top: env(safe-area-inset-top, 0px);
   background: linear-gradient(180deg, rgba(7, 16, 31, 0.9), rgba(8, 18, 33, 0.78));
   box-shadow: 0 8px 30px rgba(1, 6, 16, 0.45);
 }
