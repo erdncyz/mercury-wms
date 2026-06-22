@@ -270,14 +270,26 @@ export default function InventoryScreen({ t }) {
       totalSales += qty;
 
       const key = dealerId || dealerName;
-      const current = dealersSalesMap.get(key) || 0;
-      dealersSalesMap.set(key, current + qty);
+      const current = dealersSalesMap.get(key) || { name: "", qty: 0 };
+      
+      // Dealer adını bul
+      let displayName = current.name;
+      if (!displayName) {
+        if (dealerId) {
+          const dealer = dealers.find((d) => d.id === dealerId);
+          displayName = dealer?.name || dealerName || dealerId;
+        } else {
+          displayName = dealerName;
+        }
+      }
+      
+      dealersSalesMap.set(key, { name: displayName, qty: current.qty + qty });
     });
 
     const topDealers = Array.from(dealersSalesMap.entries())
-      .map(([name, qty]) => ({ name, qty }))
+      .map(([, data]) => ({ name: data.name, qty: data.qty }))
       .sort((a, b) => b.qty - a.qty)
-      .slice(0, 3);
+      .slice(0, 5);
 
     return {
       totalProducts: products.length,
@@ -1008,7 +1020,7 @@ export default function InventoryScreen({ t }) {
 
         {showSummary ? (
           <div className="mt-4 space-y-3">
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
               {/* Toplam Ürün */}
               <div className="group relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-blue-600/5 p-3 transition-all hover:border-blue-400/50 hover:shadow-lg hover:shadow-blue-500/20">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-400/0 to-blue-500/0 group-hover:via-blue-400/5 transition-all" />
@@ -1021,13 +1033,6 @@ export default function InventoryScreen({ t }) {
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-400/0 to-cyan-500/0 group-hover:via-cyan-400/5 transition-all" />
                 <p className="relative text-[10px] font-bold uppercase tracking-wider text-cyan-300">{t.summaryTotalStock}</p>
                 <p className="relative mt-1.5 text-2xl font-black text-cyan-100">{summary.totalStock.toLocaleString("tr-TR")}</p>
-              </div>
-
-              {/* Stok Değeri */}
-              <div className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 p-3 transition-all hover:border-emerald-400/50 hover:shadow-lg hover:shadow-emerald-500/20">
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-400/0 to-emerald-500/0 group-hover:via-emerald-400/5 transition-all" />
-                <p className="relative text-[10px] font-bold uppercase tracking-wider text-emerald-300">{t.summaryTotalValue}</p>
-                <p className="relative mt-1.5 text-xl font-black text-emerald-100">{summary.totalValue.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}</p>
               </div>
 
               {/* Düşük Stok */}
@@ -1054,7 +1059,7 @@ export default function InventoryScreen({ t }) {
               </div>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-3">
+            <div className="grid gap-2 md:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{t.summaryWarehouseDistribution}</p>
                 {summary.warehouseDistribution.length > 0 ? (
@@ -1086,7 +1091,7 @@ export default function InventoryScreen({ t }) {
                 {summary.topDealers.length > 0 ? (
                   <ol className="space-y-1.5">
                     {summary.topDealers.map((item, index) => (
-                      <li key={item.name} className="flex items-center justify-between gap-2 text-xs">
+                      <li key={`${item.name}-${index}`} className="flex items-center justify-between gap-2 text-xs">
                         <span className="flex min-w-0 items-center gap-2">
                           <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-400/20 text-[10px] font-bold text-purple-300">
                             {index + 1}
@@ -1095,32 +1100,6 @@ export default function InventoryScreen({ t }) {
                         </span>
                         <span className="shrink-0 font-semibold text-purple-300">
                           {item.qty} adet
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="text-xs text-slate-500">{t.summaryNoData}</p>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
-                <div className="mb-2 flex items-baseline justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{t.summaryTopProducts}</p>
-                  <p className="text-[10px] text-slate-500">{t.summaryTopProductsHint}</p>
-                </div>
-                {summary.topProducts.length > 0 ? (
-                  <ol className="space-y-1.5">
-                    {summary.topProducts.map((item, index) => (
-                      <li key={item.id} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-300/15 text-[10px] font-bold text-amber-300">
-                            {index + 1}
-                          </span>
-                          <span className="truncate text-slate-200">{item.name}</span>
-                        </span>
-                        <span className="shrink-0 font-semibold text-emerald-300">
-                          {item.value.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}
                         </span>
                       </li>
                     ))}
