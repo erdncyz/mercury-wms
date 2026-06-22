@@ -92,6 +92,9 @@ export default function DealerManagementScreen({ t }) {
       const existing = entry.products.get(productKey);
       if (existing) {
         existing.qty += qty;
+        if (!existing.productId && productId) {
+          existing.productId = productId;
+        }
       } else {
         entry.products.set(productKey, { name: productName, productId, qty });
       }
@@ -299,8 +302,11 @@ export default function DealerManagementScreen({ t }) {
 
     try {
       // Ürünün depo bilgisini al
-      const product = products.find((p) => p.id === pendingReturn.productId);
-      const warehouseLocation = String(product?.details?.warehouseLocation || "").trim();
+      let warehouseLocation = "";
+      if (pendingReturn.productId) {
+        const product = products.find((p) => p.id === pendingReturn.productId);
+        warehouseLocation = String(product?.details?.warehouseLocation || "").trim();
+      }
 
       await applyStockChange({
         productId: pendingReturn.productId,
@@ -630,6 +636,7 @@ export default function DealerManagementScreen({ t }) {
               <p className="text-sm text-slate-300">
                 Depo: <span className="font-bold text-purple-300">
                   {(() => {
+                    if (!pendingReturn.productId) return "-";
                     const prod = products.find((p) => p.id === pendingReturn.productId);
                     return String(prod?.details?.warehouseLocation || "-").trim() || "-";
                   })()}
