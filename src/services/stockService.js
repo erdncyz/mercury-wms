@@ -423,7 +423,8 @@ export async function applyStockChange({
 }) {
   const normalizedProductId = String(productId || "").trim();
   const normalizedProductName = String(productName || "").trim();
-  const parsedAmount = Number(amount);
+  const parsedAmount = Math.floor(Number(amount));
+  const normalizedType = String(type || "").trim().toUpperCase() === "IN" ? "IN" : "OUT";
   const normalizedDestination = String(destination || "").trim().slice(0, 200);
   const normalizedDealerId = String(dealerId || "").trim().slice(0, 128);
   const normalizedDealerName = String(dealerName || "").trim().slice(0, 160);
@@ -431,6 +432,10 @@ export async function applyStockChange({
   let afterStock = 0;
   let warehouse = "";
   let barcode = "";
+
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    throw new Error("Invalid amount");
+  }
 
   // Only update stock if productId is provided
   if (normalizedProductId) {
@@ -442,7 +447,7 @@ export async function applyStockChange({
 
       const data = snap.data();
       const currentCount = Number(data.details?.totalProductCount || 0);
-      const nextCount = type === "IN" ? currentCount + parsedAmount : currentCount - parsedAmount;
+      const nextCount = normalizedType === "IN" ? currentCount + parsedAmount : currentCount - parsedAmount;
 
       beforeStock = currentCount;
       afterStock = nextCount;
@@ -465,7 +470,7 @@ export async function applyStockChange({
   await addDoc(collection(db, "stock_logs"), {
     productId: normalizedProductId,
     productName: normalizedProductName,
-    type,
+    type: normalizedType,
     amount: parsedAmount,
     destination: normalizedDestination,
     dealerId: normalizedDealerId,
@@ -474,19 +479,19 @@ export async function applyStockChange({
   });
 
   await logActivity({
-    action: type === "IN" ? "stock_in" : "stock_out",
+    action: normalizedType === "IN" ? "stock_in" : "stock_out",
     productId: normalizedProductId,
     productName: normalizedProductName,
     amount: parsedAmount,
     destination: normalizedDestination,
     source: "scanner_stock_action",
-    stockType: type,
+    stockType: normalizedType,
     beforeStock,
     afterStock,
     dealerId: normalizedDealerId,
     dealerName: normalizedDealerName,
     warehouseFrom: warehouse,
-    warehouseTo: type === "IN" ? warehouse : normalizedDestination,
+    warehouseTo: normalizedType === "IN" ? warehouse : normalizedDestination,
     barcode
   });
 }

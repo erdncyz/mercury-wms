@@ -37,7 +37,6 @@ export default function DealerManagementScreen({ t }) {
   const [error, setError] = useState("");
   const [pendingDelete, setPendingDelete] = useState(null);
   const [pendingReturn, setPendingReturn] = useState(null);
-  const [returnAmount, setReturnAmount] = useState(1);
   const [editedSalesAmount, setEditedSalesAmount] = useState(1);
 
   useEffect(() => {
@@ -268,18 +267,24 @@ export default function DealerManagementScreen({ t }) {
   const onReturnProduct = async () => {
     if (!pendingReturn || busy) return;
 
-    // Satılan miktarın değişmesinden kaynaklanan fark
-    const salesToRemove = Math.max(0, pendingReturn.qty - editedSalesAmount);
-    const additionalReturn = Math.floor(Number(returnAmount));
-    const totalAmount = salesToRemove + additionalReturn;
+    // İade edilecek miktar = mevcut satış - yeni satılan miktar
+    const soldQty = Math.floor(Number(pendingReturn.qty));
+    const newSoldQty = Math.floor(Number(editedSalesAmount));
 
-    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    if (!Number.isFinite(newSoldQty) || newSoldQty < 0) {
       setError(t.invalidAmount || "Geçersiz miktar");
       return;
     }
 
-    if (totalAmount > pendingReturn.qty) {
-      setError(t.notEnoughStock || "Satılan miktardan fazla iade edemezsiniz");
+    if (newSoldQty > soldQty) {
+      setError("Yeni satılan miktar mevcuttan fazla olamaz");
+      return;
+    }
+
+    const returnQty = soldQty - newSoldQty;
+
+    if (returnQty <= 0) {
+      setError("İade edilecek miktar 0. Satılan miktarı azaltın.");
       return;
     }
 
@@ -299,7 +304,7 @@ export default function DealerManagementScreen({ t }) {
       await applyStockChange({
         productId: productId || "",
         productName: String(pendingReturn.name || "").trim(),
-        amount: totalAmount,
+        amount: returnQty,
         type: "IN",
         destination: warehouseLocation,
         dealerId: String(pendingReturn.dealerId || ""),
@@ -308,10 +313,10 @@ export default function DealerManagementScreen({ t }) {
 
       setMessage(t.actionDone || "İade işlemi başarılı");
       setPendingReturn(null);
-      setReturnAmount(1);
       setEditedSalesAmount(1);
     } catch (returnError) {
-      setError(returnError.message || t.saveError);
+      const msg = String(returnError?.message || "");
+      setError(msg.includes("Insufficient") ? (t.notEnoughStock || "Yetersiz stok") : (t.saveError || "Bir hata oluştu"));
     } finally {
       setBusy(false);
     }
@@ -321,7 +326,12 @@ export default function DealerManagementScreen({ t }) {
     if (!pendingReturn || busy) return;
 
     // Tüm satış kaydını sil (orijinal qty kadar iade et)
-    const amount = pendingReturn.qty;
+    const amount = Math.floor(Number(pendingReturn.qty));
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError(t.invalidAmount || "Geçersiz miktar");
+      return;
+    }
 
     setBusy(true);
     setError("");
@@ -348,10 +358,10 @@ export default function DealerManagementScreen({ t }) {
 
       setMessage("Satış tamamen çıkarıldı ve stok geri alındı");
       setPendingReturn(null);
-      setReturnAmount(1);
       setEditedSalesAmount(1);
     } catch (returnError) {
-      setError(returnError.message || t.saveError);
+      const msg = String(returnError?.message || "");
+      setError(msg.includes("Insufficient") ? (t.notEnoughStock || "Yetersiz stok") : (t.saveError || "Bir hata oluştu"));
     } finally {
       setBusy(false);
     }
@@ -559,7 +569,6 @@ export default function DealerManagementScreen({ t }) {
                                           dealerId: dealer.id,
                                           dealerName: dealer.name
                                         });
-                                        setReturnAmount(1);
                                         setEditedSalesAmount(item.qty);
                                       }}
                                       disabled={busy}
@@ -670,16 +679,9 @@ export default function DealerManagementScreen({ t }) {
               <p className="text-sm text-slate-300">
                 Ürün: <span className="font-bold text-slate-100">{pendingReturn.name}</span>
               </p>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-slate-300">Satılan Miktarı:</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={editedSalesAmount}
-                  onChange={(e) => setEditedSalesAmount(Number(e.target.value) || 1)}
-                  className="w-20 rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-2 py-1 text-sm font-bold text-cyan-200 outline-none focus:border-cyan-300"
-                />
-              </div>
+              <p className="text-sm text-slate-300">
+                Mevcut Satılan: <span className="font-bold text-cyan-200">{pendingReturn.qty} adet</span>
+              </p>
               <p className="text-sm text-slate-300">
                 Depo: <span className="font-bold text-purple-300">
                   {(() => {
@@ -692,26 +694,29 @@ export default function DealerManagementScreen({ t }) {
             </div>
 
             <div className="mt-4 space-y-2">
-              <label className="block text-sm text-slate-300">Kaç adet iade etmek istiyorsunuz?</label>
+              <label className="block text-sm text-slate-300">Yeni satılan miktar (fark stoğa iade edilir)</label>
               <div className="flex gap-2">
                 <input
                   type="number"
-                  min="1"
-                  max={Math.max(1, pendingReturn.qty - editedSalesAmount + Number(returnAmount))}
-                  value={returnAmount}
-                  onChange={(e) => setReturnAmount(e.target.value)}
+                  min="0"
+                  max={pendingReturn.qty}
+                  value={editedSalesAmount}
+                  onChange={(e) => setEditedSalesAmount(e.target.value)}
                   className="flex-1 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-amber-300"
                 />
                 <button
                   type="button"
-                  onClick={() => setReturnAmount(String(Math.max(0, pendingReturn.qty - editedSalesAmount)))}
+                  onClick={() => setEditedSalesAmount(0)}
                   disabled={busy}
                   className="rounded-xl border border-amber-300/35 bg-amber-300/10 px-2 py-2 text-xs font-bold text-amber-200 disabled:opacity-50"
-                  title="Farkı seç"
+                  title="Tümünü iade et"
                 >
                   Tümü
                 </button>
               </div>
+              <p className="text-xs text-amber-200/80">
+                İade edilecek: <span className="font-bold">{Math.max(0, pendingReturn.qty - (Math.floor(Number(editedSalesAmount)) || 0))} adet</span>
+              </p>
             </div>
 
             {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
