@@ -9,7 +9,9 @@ import {
   HiOutlineQrCode,
   HiOutlineSparkles,
   HiOutlineSquares2X2,
-  HiOutlineUserCircle
+  HiOutlineUserCircle,
+  HiOutlineDevicePhoneMobile,
+  HiOutlineXMark
 } from "react-icons/hi2";
 import { auth } from "./firebase";
 import { labels } from "./i18n";
@@ -27,6 +29,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("list");
   const [lang, setLang] = useState("tr");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isInstallOpen, setIsInstallOpen] = useState(false);
   const profileMenuRef = useRef(null);
 
   const t = useMemo(() => labels[lang], [lang]);
@@ -95,6 +98,15 @@ export default function App() {
               </a>
               <button
                 type="button"
+                onClick={() => setIsInstallOpen(true)}
+                className="install-chip hidden items-center justify-center rounded-xl p-2 sm:inline-flex"
+                aria-label={t.installButtonAria}
+                title={t.installTitle}
+              >
+                <HiOutlineDevicePhoneMobile size={20} />
+              </button>
+              <button
+                type="button"
                 onClick={() => setLang((v) => (v === "tr" ? "en" : "tr"))}
                 className="chip-button rounded-xl p-2"
                 aria-label="Change language"
@@ -132,15 +144,26 @@ export default function App() {
             </div>
           </div>
 
-          <a
-            href={CREATOR_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="creator-link mt-3 inline-flex w-full justify-center sm:hidden"
-          >
-            <HiOutlineSparkles size={15} className="creator-link-icon" />
-            Geliştiren Erdinç Yılmaz
-          </a>
+          <div className="mt-3 flex items-center gap-2 sm:hidden">
+            <a
+              href={CREATOR_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="creator-link inline-flex flex-1 justify-center"
+            >
+              <HiOutlineSparkles size={15} className="creator-link-icon" />
+              Geliştiren Erdinç Yılmaz
+            </a>
+            <button
+              type="button"
+              onClick={() => setIsInstallOpen(true)}
+              className="install-chip inline-flex shrink-0 items-center justify-center rounded-xl p-2.5"
+              aria-label={t.installButtonAria}
+              title={t.installTitle}
+            >
+              <HiOutlineDevicePhoneMobile size={20} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -202,6 +225,81 @@ export default function App() {
           </button>
         </div>
       </nav>
+
+      {isInstallOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={() => setIsInstallOpen(false)}
+        >
+          <div
+            className="premium-panel install-sheet max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl p-5 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="install-sheet-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl">
+                  <HiOutlineDevicePhoneMobile size={22} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-display text-lg font-bold text-slate-100">{t.installTitle}</h3>
+                  <p className="text-xs text-slate-400">{t.installSubtitle}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsInstallOpen(false)}
+                className="chip-button rounded-xl p-2 text-slate-300"
+                aria-label={t.close}
+              >
+                <HiOutlineXMark size={18} />
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm text-slate-300">{t.installIntro}</p>
+
+            <div className="mt-4 space-y-3">
+              <div className="install-step rounded-2xl p-4">
+                <p className="install-step-title mb-2 text-sm font-bold text-cyan-200">{t.installAndroidTitle}</p>
+                <ol className="space-y-1.5 text-sm text-slate-300">
+                  <li className="flex gap-2"><span className="install-num">1</span>{t.installAndroidStep1}</li>
+                  <li className="flex gap-2"><span className="install-num">2</span>{t.installAndroidStep2}</li>
+                  <li className="flex gap-2"><span className="install-num">3</span>{t.installAndroidStep3}</li>
+                </ol>
+              </div>
+
+              <div className="install-step rounded-2xl p-4">
+                <p className="install-step-title mb-2 text-sm font-bold text-cyan-200">{t.installIosTitle}</p>
+                <ol className="space-y-1.5 text-sm text-slate-300">
+                  <li className="flex gap-2"><span className="install-num">1</span>{t.installIosStep1}</li>
+                  <li className="flex gap-2"><span className="install-num">2</span>{t.installIosStep2}</li>
+                  <li className="flex gap-2"><span className="install-num">3</span>{t.installIosStep3}</li>
+                </ol>
+              </div>
+
+              <div className="install-step rounded-2xl p-4">
+                <p className="install-step-title mb-2 text-sm font-bold text-cyan-200">{t.installDesktopTitle}</p>
+                <ol className="space-y-1.5 text-sm text-slate-300">
+                  <li className="flex gap-2"><span className="install-num">1</span>{t.installDesktopStep1}</li>
+                  <li className="flex gap-2"><span className="install-num">2</span>{t.installDesktopStep2}</li>
+                </ol>
+              </div>
+            </div>
+
+            <p className="mt-4 flex items-start gap-2 text-xs text-slate-400">
+              <HiOutlineSparkles size={15} className="mt-0.5 shrink-0 text-cyan-300" />
+              {t.installNote}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setIsInstallOpen(false)}
+              className="premium-cta mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-cyan-100"
+            >
+              {t.close}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
