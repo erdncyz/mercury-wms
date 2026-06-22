@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "rea
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
 import * as XLSX from "xlsx";
-import { applyStockChange, createProduct, deleteProduct, deleteProductsBulk, subscribeDealers, subscribeProducts, transferStock, updateProduct, uploadProductRefImage } from "../services/stockService";
+import { applyStockChange, createProduct, deleteProduct, deleteProductsBulk, subscribeActivityLogs, subscribeDealers, subscribeProducts, transferStock, updateProduct, uploadProductRefImage } from "../services/stockService";
 
 const OPTIONAL_TEXT_FIELDS = ["productCode", "containerNumber", "warehouseLocation", "features", "imageRef"];
 const OPTIONAL_NUMERIC_FIELDS = ["totalProductCount", "unitKg", "totalKg", "widthCm", "lengthCm", "heightCm", "unitM3", "totalM3"];
@@ -138,6 +138,7 @@ export default function InventoryScreen({ t }) {
   const [stockOutDestination, setStockOutDestination] = useState("");
   const [stockOutDealerId, setStockOutDealerId] = useState("");
   const [dealers, setDealers] = useState([]);
+  const [salesLogs, setSalesLogs] = useState([]);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [refImageFile, setRefImageFile] = useState(null);
@@ -172,6 +173,11 @@ export default function InventoryScreen({ t }) {
 
   useEffect(() => {
     const unsub = subscribeDealers((rows) => setDealers(rows));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeActivityLogs((rows) => setSalesLogs(rows));
     return () => unsub();
   }, []);
 
@@ -246,15 +252,45 @@ export default function InventoryScreen({ t }) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
+    // Bayiler satış verilerini hesapla
+    const dealersSalesMap = new Map();
+    let totalSales = 0;
+
+    salesLogs.forEach((log) => {
+      const isStockOut = String(log.stockType || "").toUpperCase() === "OUT" || log.action === "stock_out";
+      if (!isStockOut) return;
+
+      const dealerId = String(log.dealerId || "").trim();
+      const dealerName = String(log.dealerName || "").trim();
+      if (!dealerId && !dealerName) return;
+
+      const qty = Math.abs(Number(log.amount || 0));
+      if (!Number.isFinite(qty) || qty <= 0) return;
+
+      totalSales += qty;
+
+      const key = dealerId || dealerName;
+      const current = dealersSalesMap.get(key) || 0;
+      dealersSalesMap.set(key, current + qty);
+    });
+
+    const topDealers = Array.from(dealersSalesMap.entries())
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 3);
+
     return {
       totalProducts: products.length,
       totalStock,
       totalValue,
       lowStock,
       warehouseDistribution,
-      topProducts
+      topProducts,
+      totalDealersSales: dealersSalesMap.size,
+      totalSalesQty: totalSales,
+      topDealers
     };
-  }, [products]);
+  }, [products, salesLogs]);
 
   const sorted = useMemo(() => {
     const getStock = (p) => {
@@ -971,29 +1007,54 @@ export default function InventoryScreen({ t }) {
         </div>
 
         {showSummary ? (
-          <div className="mt-3 space-y-3">
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
-                <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">{t.summaryTotalProducts}</p>
-                <p className="mt-1 text-2xl font-extrabold text-slate-100">{summary.totalProducts.toLocaleString("tr-TR")}</p>
+          <div className="mt-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
+              {/* Toplam Ürün */}
+              <div className="group relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-blue-600/5 p-3 transition-all hover:border-blue-400/50 hover:shadow-lg hover:shadow-blue-500/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-400/0 to-blue-500/0 group-hover:via-blue-400/5 transition-all" />
+                <p className="relative text-[10px] font-bold uppercase tracking-wider text-blue-300">{t.summaryTotalProducts}</p>
+                <p className="relative mt-1.5 text-2xl font-black text-blue-100">{summary.totalProducts.toLocaleString("tr-TR")}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
-                <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">{t.summaryTotalStock}</p>
-                <p className="mt-1 text-2xl font-extrabold text-cyan-200">{summary.totalStock.toLocaleString("tr-TR")}</p>
+
+              {/* Toplam Stok */}
+              <div className="group relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 p-3 transition-all hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-400/0 to-cyan-500/0 group-hover:via-cyan-400/5 transition-all" />
+                <p className="relative text-[10px] font-bold uppercase tracking-wider text-cyan-300">{t.summaryTotalStock}</p>
+                <p className="relative mt-1.5 text-2xl font-black text-cyan-100">{summary.totalStock.toLocaleString("tr-TR")}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
-                <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">{t.summaryTotalValue}</p>
-                <p className="mt-1 text-2xl font-extrabold text-emerald-300">{summary.totalValue.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</p>
+
+              {/* Stok Değeri */}
+              <div className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 p-3 transition-all hover:border-emerald-400/50 hover:shadow-lg hover:shadow-emerald-500/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-400/0 to-emerald-500/0 group-hover:via-emerald-400/5 transition-all" />
+                <p className="relative text-[10px] font-bold uppercase tracking-wider text-emerald-300">{t.summaryTotalValue}</p>
+                <p className="relative mt-1.5 text-xl font-black text-emerald-100">{summary.totalValue.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
-                <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">{t.summaryLowStock}</p>
-                <p className={`mt-1 text-2xl font-extrabold ${summary.lowStock > 0 ? "text-rose-400" : "text-slate-100"}`}>
+
+              {/* Düşük Stok */}
+              <div className={`group relative overflow-hidden rounded-2xl border transition-all p-3 ${summary.lowStock > 0 ? "border-rose-500/30 bg-gradient-to-br from-rose-500/10 to-rose-600/5 hover:border-rose-400/50 hover:shadow-lg hover:shadow-rose-500/20" : "border-slate-500/20 bg-gradient-to-br from-slate-500/5 to-slate-600/5"}`}>
+                <div className={`absolute inset-0 bg-gradient-to-r transition-all ${summary.lowStock > 0 ? "from-rose-500/0 via-rose-400/0 to-rose-500/0 group-hover:via-rose-400/5" : ""}`} />
+                <p className={`relative text-[10px] font-bold uppercase tracking-wider ${summary.lowStock > 0 ? "text-rose-300" : "text-slate-400"}`}>Düşük Stok</p>
+                <p className={`relative mt-1.5 text-2xl font-black ${summary.lowStock > 0 ? "text-rose-100" : "text-slate-300"}`}>
                   {summary.lowStock.toLocaleString("tr-TR")}
                 </p>
               </div>
+
+              {/* Bayi Sayısı */}
+              <div className="group relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-purple-600/5 p-3 transition-all hover:border-purple-400/50 hover:shadow-lg hover:shadow-purple-500/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-400/0 to-purple-500/0 group-hover:via-purple-400/5 transition-all" />
+                <p className="relative text-[10px] font-bold uppercase tracking-wider text-purple-300">Bayi Satışları</p>
+                <p className="relative mt-1.5 text-2xl font-black text-purple-100">{summary.totalDealersSales.toLocaleString("tr-TR")}</p>
+              </div>
+
+              {/* Toplam Satış Sayısı */}
+              <div className="group relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 p-3 transition-all hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-500/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-400/0 to-amber-500/0 group-hover:via-amber-400/5 transition-all" />
+                <p className="relative text-[10px] font-bold uppercase tracking-wider text-amber-300">Satış Adedi</p>
+                <p className="relative mt-1.5 text-2xl font-black text-amber-100">{summary.totalSalesQty.toLocaleString("tr-TR")}</p>
+              </div>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid gap-2 md:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{t.summaryWarehouseDistribution}</p>
                 {summary.warehouseDistribution.length > 0 ? (
@@ -1013,6 +1074,31 @@ export default function InventoryScreen({ t }) {
                       );
                     })}
                   </ul>
+                ) : (
+                  <p className="text-xs text-slate-500">{t.summaryNoData}</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">En Çok Satış Yapılan Bayiler</p>
+                </div>
+                {summary.topDealers.length > 0 ? (
+                  <ol className="space-y-1.5">
+                    {summary.topDealers.map((item, index) => (
+                      <li key={item.name} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-400/20 text-[10px] font-bold text-purple-300">
+                            {index + 1}
+                          </span>
+                          <span className="truncate text-slate-200">{item.name}</span>
+                        </span>
+                        <span className="shrink-0 font-semibold text-purple-300">
+                          {item.qty} adet
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
                 ) : (
                   <p className="text-xs text-slate-500">{t.summaryNoData}</p>
                 )}
