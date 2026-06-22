@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { HiOutlineCamera, HiOutlineXMark } from "react-icons/hi2";
+import { HiOutlineCamera, HiOutlineXMark, HiOutlineMagnifyingGlass, HiOutlinePlus, HiOutlineTrash, HiOutlineArrowDownTray, HiOutlineBuildingStorefront, HiOutlineArrowsUpDown } from "react-icons/hi2";
 import * as XLSX from "xlsx";
 import { applyStockChange, createProduct, deleteProduct, deleteProductsBulk, subscribeActivityLogs, subscribeDealers, subscribeProducts, transferStock, updateProduct, uploadProductRefImage } from "../services/stockService";
 
@@ -1136,19 +1136,35 @@ export default function InventoryScreen({ t }) {
         ) : null}
       </div>
 
-      <div className="glass rounded-3xl p-4">
+      <div className="premium-panel rounded-3xl p-5">
         <div className="flex flex-col gap-3 sm:flex-row">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t.searchPlaceholder}
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-4 text-base outline-none focus:border-cyan-300"
-          />
+          <div className="search-field group relative w-full">
+            <HiOutlineMagnifyingGlass
+              size={20}
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition group-focus-within:text-cyan-300"
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="w-full rounded-2xl border border-white/10 bg-slate-950/50 py-4 pl-12 pr-11 text-base outline-none transition focus:border-cyan-300/70 focus:bg-slate-950/70"
+            />
+            {search ? (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label={t.cancel}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition hover:bg-white/10 hover:text-slate-100"
+              >
+                <HiOutlineXMark size={18} />
+              </button>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={isSearchScannerOpen ? () => stopSearchScanner() : onStartSearchScan}
             disabled={busy || !!scannerTarget || isStartingSearchScan}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/35 bg-cyan-300/10 px-4 py-4 text-sm font-bold text-cyan-200 disabled:opacity-50 sm:min-w-[180px]"
+            className="premium-cta inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-bold text-cyan-100 disabled:opacity-50 sm:min-w-[190px]"
           >
             {isSearchScannerOpen ? <HiOutlineXMark size={18} /> : <HiOutlineCamera size={18} />}
             {isSearchScannerOpen ? t.cancel : t.searchByCamera}
@@ -1156,36 +1172,48 @@ export default function InventoryScreen({ t }) {
         </div>
 
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <select
-            value={warehouseFilter}
-            onChange={(e) => setWarehouseFilter(e.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-300 sm:max-w-[260px]"
-          >
-            <option value="">{t.allWarehouses}</option>
-            <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
-            <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
-          </select>
+          <div className="select-shell group relative w-full sm:max-w-[260px]">
+            <HiOutlineBuildingStorefront
+              size={18}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition group-focus-within:text-cyan-300"
+            />
+            <select
+              value={warehouseFilter}
+              onChange={(e) => setWarehouseFilter(e.target.value)}
+              className="w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/50 py-3 pl-10 pr-9 text-sm outline-none transition focus:border-cyan-300/70"
+            >
+              <option value="">{t.allWarehouses}</option>
+              <option value={t.warehouseSiteler}>{t.warehouseSiteler}</option>
+              <option value={t.warehouseAkyurt}>{t.warehouseAkyurt}</option>
+            </select>
+            <span className="select-caret pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          </div>
 
           <button
             type="button"
             onClick={() => setLowStockOnly((prev) => !prev)}
             className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-bold transition ${
               lowStockOnly
-                ? "border-rose-400/50 bg-rose-400/15 text-rose-200"
-                : "border-white/10 bg-slate-900/60 text-slate-300 hover:border-rose-400/30"
+                ? "border-rose-400/50 bg-rose-400/15 text-rose-200 shadow-[0_0_18px_-6px_rgba(251,113,133,0.6)]"
+                : "border-white/10 bg-slate-950/50 text-slate-300 hover:border-rose-400/30 hover:text-rose-200"
             }`}
           >
-            <span className={`h-2 w-2 rounded-full ${lowStockOnly ? "bg-rose-400" : "bg-slate-500"}`} />
+            <span className={`h-2 w-2 rounded-full transition ${lowStockOnly ? "animate-pulse bg-rose-400" : "bg-slate-500"}`} />
             {t.lowStock}
           </button>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-300 sm:max-w-[220px]"
-            aria-label={t.sortBy}
-          >
-            <option value="nameAsc">{t.sortNameAsc}</option>
+          <div className="select-shell group relative w-full sm:max-w-[220px]">
+            <HiOutlineArrowsUpDown
+              size={18}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition group-focus-within:text-cyan-300"
+            />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/50 py-3 pl-10 pr-9 text-sm outline-none transition focus:border-cyan-300/70"
+              aria-label={t.sortBy}
+            >
+              <option value="nameAsc">{t.sortNameAsc}</option>
             <option value="nameDesc">{t.sortNameDesc}</option>
             <option value="stockAsc">{t.sortStockAsc}</option>
             <option value="stockDesc">{t.sortStockDesc}</option>
@@ -1193,7 +1221,9 @@ export default function InventoryScreen({ t }) {
             <option value="priceDesc">{t.sortPriceDesc}</option>
             <option value="warehouseAsc">{t.sortWarehouseAsc}</option>
             <option value="warehouseDesc">{t.sortWarehouseDesc}</option>
-          </select>
+            </select>
+            <span className="select-caret pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          </div>
         </div>
 
         {isSearchScannerOpen ? (
@@ -1228,20 +1258,24 @@ export default function InventoryScreen({ t }) {
 
         {searchScanError ? <p className="mt-2 text-xs text-rose-300">{searchScanError}</p> : null}
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="premium-divider my-4" />
+
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={openCreate}
-            className="rounded-xl border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-sm font-bold text-cyan-200"
+            className="action-pill action-pill-cyan inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold text-cyan-100"
           >
+            <HiOutlinePlus size={16} />
             {t.manualAddProduct}
           </button>
 
           <button
             type="button"
             onClick={onToggleBulkMode}
-            className="rounded-xl border border-amber-300/35 bg-amber-300/10 px-3 py-2 text-sm font-bold text-amber-200"
+            className={`action-pill inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold ${bulkMode ? "action-pill-amber-active text-amber-50" : "action-pill-amber text-amber-100"}`}
           >
+            <HiOutlineTrash size={16} />
             {bulkMode ? t.exitBulkDeleteMode : t.bulkDeleteMode}
           </button>
 
@@ -1249,8 +1283,9 @@ export default function InventoryScreen({ t }) {
             type="button"
             onClick={onExportExcel}
             disabled={sorted.length === 0}
-            className="rounded-xl border border-emerald-300/35 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-200 disabled:opacity-50"
+            className="action-pill action-pill-emerald inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold text-emerald-100 disabled:opacity-50"
           >
+            <HiOutlineArrowDownTray size={16} />
             {t.exportExcel}
           </button>
 
