@@ -74,7 +74,7 @@ export default function DealerManagementScreen({ t }) {
       const dealerName = String(log.dealerName || "").trim();
       if (!dealerId && !dealerName) return;
 
-      const key = dealerId || `name:${dealerName.toLocaleLowerCase("tr")}`;
+      const key = dealerId || `name:${String(dealerName || "").toLocaleLowerCase("tr")}`;
       const qty = Math.abs(Number(log.amount || 0));
       if (!Number.isFinite(qty) || qty <= 0) return;
 
@@ -109,7 +109,7 @@ export default function DealerManagementScreen({ t }) {
       const dealerName = String(log.dealerName || "").trim();
       if (!dealerId && !dealerName) return;
 
-      const key = dealerId || `name:${dealerName.toLocaleLowerCase("tr")}`;
+      const key = dealerId || `name:${String(dealerName || "").toLocaleLowerCase("tr")}`;
       const qty = Math.abs(Number(log.amount || 0));
       if (!Number.isFinite(qty) || qty <= 0) return;
 
@@ -319,6 +319,43 @@ export default function DealerManagementScreen({ t }) {
       });
 
       setMessage(t.actionDone || "İade işlemi başarılı");
+      setPendingReturn(null);
+      setReturnAmount(1);
+    } catch (returnError) {
+      setError(returnError.message || t.saveError);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRemoveAllSales = async () => {
+    if (!pendingReturn || busy) return;
+
+    const amount = pendingReturn.qty;
+
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      // Ürünün depo bilgisini al
+      let warehouseLocation = "";
+      if (pendingReturn.productId) {
+        const product = products.find((p) => p.id === pendingReturn.productId);
+        warehouseLocation = String(product?.details?.warehouseLocation || "").trim();
+      }
+
+      await applyStockChange({
+        productId: pendingReturn.productId,
+        productName: pendingReturn.name,
+        amount,
+        type: "IN",
+        destination: warehouseLocation,
+        dealerId: String(pendingReturn.dealerId || ""),
+        dealerName: String(pendingReturn.dealerName || "")
+      });
+
+      setMessage("Satış tamamen çıkarıldı ve stok geri alındı");
       setPendingReturn(null);
       setReturnAmount(1);
     } catch (returnError) {
@@ -646,24 +683,44 @@ export default function DealerManagementScreen({ t }) {
 
             <div className="mt-4 space-y-2">
               <label className="block text-sm text-slate-300">Kaç adet iade etmek istiyorsunuz?</label>
-              <input
-                type="number"
-                min="1"
-                max={pendingReturn.qty}
-                value={returnAmount}
-                onChange={(e) => setReturnAmount(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-amber-300"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max={pendingReturn.qty}
+                  value={returnAmount}
+                  onChange={(e) => setReturnAmount(e.target.value)}
+                  className="flex-1 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm outline-none focus:border-amber-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => setReturnAmount(String(pendingReturn.qty))}
+                  disabled={busy}
+                  className="rounded-xl border border-amber-300/35 bg-amber-300/10 px-2 py-2 text-xs font-bold text-amber-200 disabled:opacity-50"
+                  title="Tümünü seç"
+                >
+                  Tümü
+                </button>
+              </div>
             </div>
 
             {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
 
-            <div className="mt-4 flex items-center justify-end gap-2">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                onClick={onRemoveAllSales}
+                disabled={busy}
+                className="rounded-xl border border-rose-300/35 bg-rose-500/10 px-3 py-2 text-sm font-bold text-rose-300 disabled:opacity-50"
+                title="Bayiden çek, satıştan tamamen sil"
+              >
+                🗑️ Tamamen Çıkar
+              </button>
               <button
                 type="button"
                 onClick={() => setPendingReturn(null)}
                 disabled={busy}
-                className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 disabled:opacity-50"
+                className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold disabled:opacity-50"
               >
                 {t.cancel}
               </button>
@@ -673,7 +730,7 @@ export default function DealerManagementScreen({ t }) {
                 disabled={busy}
                 className="rounded-xl border border-amber-300/35 bg-amber-500/10 px-3 py-2 text-sm font-bold text-amber-200 disabled:opacity-50"
               >
-                {busy ? t.loading : "İade Tamamla"}
+                {busy ? t.loading : "✓ İade Tamamla"}
               </button>
             </div>
           </div>
