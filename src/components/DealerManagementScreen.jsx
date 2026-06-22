@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createDealer, deleteDealer, subscribeDealers, updateDealer } from "../services/stockService";
+import { createDealer, deleteDealer, subscribeActivityLogs, subscribeDealers, updateDealer } from "../services/stockService";
 
 function emptyDealerForm() {
   return {
@@ -24,6 +24,8 @@ function mapSaveError(error, t) {
 
 export default function DealerManagementScreen({ t }) {
   const [dealers, setDealers] = useState([]);
+  const [salesLogs, setSalesLogs] = useState([]);
+  const [expandedSalesIds, setExpandedSalesIds] = useState([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -40,6 +42,84 @@ export default function DealerManagementScreen({ t }) {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const unsub = subscribeActivityLogs((rows) => {
+      setSalesLogs(rows);
+    }, 2000);
+    return () => unsub();
+  }, []);
+
+  // Bayi bazinda satilan urunleri (stok dusus islemleri) topla.
+  const salesByDealer = useMemo(() => {
+    const map = new Map();
+
+    salesLogs.forEach((log) => {
+      const isStockOut = String(log.stockType || "").toUpperCase() === "OUT" || log.action === "stock_out";
+      if (!isStockOut) return;
+
+      const dealerId = String(log.dealerId || "").trim();
+      const dealerName = String(log.dealerName || "").trim();
+      if (!dealerId && !dealerName) return;
+
+      const key = dealerId || `name:${dealerName.toLocaleLowerCase("tr")}`;
+      const qty = Math.abs(Number(log.amount || 0));
+      if (!Number.isFinite(qty) || qty <= 0) return;
+
+      const productName = String(log.productName || "-").trim() || "-";
+      const productKey = String(log.productId || productName);
+
+      let entry = map.get(key);
+      if (!entry) {
+        entry = { totalQty: 0, products: new Map() };
+        map.set(key, entry);
+      }
+      entry.totalQty += qty;
+
+      const existing = entry.products.get(productKey);
+      if (existing) {
+        existing.qty += qty;
+      } else {
+        entry.products.set(productKey, { name: productName, qty });
+      }
+    });
+
+    return map;
+  }, [salesLogs]);
+
+  const getDealerSales = (dealer) => {
+    const byId = salesByDealer.get(String(dealer.id));
+    const byName = salesByDealer.get(`name:${String(dealer.name || "").trim().toLocaleLowerCase("tr")}`);
+
+    if (!byId && !byName) {
+      return { totalQty: 0, products: [] };
+    }
+
+    const products = new Map();
+    let totalQty = 0;
+
+    [byId, byName].forEach((entry) => {
+      if (!entry) return;
+      totalQty += entry.totalQty;
+      entry.products.forEach((value, productKey) => {
+        const current = products.get(productKey);
+        if (current) {
+          current.qty += value.qty;
+        } else {
+          products.set(productKey, { name: value.name, qty: value.qty });
+        }
+      });
+    });
+
+    const productList = Array.from(products.values()).sort((a, b) => b.qty - a.qty);
+    return { totalQty, products: productList };
+  };
+
+  const toggleSales = (dealerId) => {
+    setExpandedSalesIds((prev) => (
+      prev.includes(dealerId) ? prev.filter((id) => id !== dealerId) : [...prev, dealerId]
+    ));
+  };
 
   const filtered = useMemo(() => {
     const q = String(search || "").trim().toLocaleLowerCase("tr");
@@ -306,6 +386,54 @@ export default function DealerManagementScreen({ t }) {
                     </button>
                   </div>
                 </div>
+
+                {(() => {
+                  const sales = getDealerSales(dealer);
+                  const isOpen = expandedSalesIds.includes(dealer.id);
+
+                  return (
+                    <div className="mt-3 rounded-xl border border-cyan-300/15 bg-cyan-300/5 p-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold text-cyan-200">
+                          {t.dealerSalesTitle}
+                        </p>
+                        <span className="rounded-lg bg-cyan-300/10 px-2 py-0.5 text-[11px] font-bold text-cyan-200">
+                          {t.dealerSalesTotal}: {sales.totalQty}
+                        </span>
+                      </div>
+
+                      {sales.products.length === 0 ? (
+                        <p className="mt-2 text-[11px] text-slate-400">{t.dealerSalesNone}</p>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleSales(dealer.id)}
+                            className="mt-2 rounded-lg border border-white/10 px-2 py-1 text-[11px] font-semibold text-slate-200"
+                          >
+                            {isOpen ? t.dealerSalesHide : t.dealerSalesShow}
+                          </button>
+
+                          {isOpen ? (
+                            <ul className="mt-2 space-y-1">
+                              {sales.products.map((item) => (
+                                <li
+                                  key={item.name}
+                                  className="flex items-center justify-between gap-2 rounded-lg bg-slate-900/40 px-2 py-1 text-[11px]"
+                                >
+                                  <span className="min-w-0 break-words text-slate-200">{item.name}</span>
+                                  <span className="shrink-0 font-bold text-cyan-200">
+                                    {t.dealerSalesCount.replace("{count}", String(item.qty))}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ))
           )}
