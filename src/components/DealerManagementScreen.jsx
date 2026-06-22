@@ -85,10 +85,9 @@ export default function DealerManagementScreen({ t }) {
 
       let entry = map.get(key);
       if (!entry) {
-        entry = { totalQty: 0, products: new Map() };
+        entry = { products: new Map() };
         map.set(key, entry);
       }
-      entry.totalQty += delta;
 
       const existing = entry.products.get(productKey);
       if (existing) {
@@ -102,7 +101,6 @@ export default function DealerManagementScreen({ t }) {
     });
 
     map.forEach((entry) => {
-      entry.totalQty = Math.max(0, entry.totalQty);
       entry.products.forEach((product, productKey) => {
         if (product.qty <= 0) {
           entry.products.delete(productKey);
@@ -124,17 +122,18 @@ export default function DealerManagementScreen({ t }) {
     }
 
     const products = new Map();
-    let totalQty = 0;
 
     [byId, byName].forEach((entry) => {
       if (!entry) return;
-      totalQty += entry.totalQty;
       entry.products.forEach((value, productKey) => {
         const current = products.get(productKey);
         if (current) {
           current.qty += value.qty;
+          if (!current.productId && value.productId) {
+            current.productId = value.productId;
+          }
         } else {
-          products.set(productKey, { name: value.name, qty: value.qty });
+          products.set(productKey, { name: value.name, productId: value.productId || "", qty: value.qty });
         }
       });
     });
@@ -142,7 +141,9 @@ export default function DealerManagementScreen({ t }) {
     const productList = Array.from(products.values())
       .filter((item) => item.qty > 0)
       .sort((a, b) => b.qty - a.qty);
-    return { totalQty: Math.max(0, totalQty), products: productList };
+    // Toplam, listede görünen urunlerin toplamiyla tutarli olmali.
+    const productsTotal = productList.reduce((sum, item) => sum + item.qty, 0);
+    return { totalQty: Math.max(0, productsTotal), products: productList };
   };
 
   const toggleSales = (dealerId) => {
@@ -551,7 +552,7 @@ export default function DealerManagementScreen({ t }) {
                             <ul className="mt-2 space-y-1">
                               {sales.products.map((item) => (
                                 <li
-                                  key={item.name}
+                                  key={item.productId || item.name}
                                   className="flex items-center justify-between gap-2 rounded-lg bg-slate-900/40 px-2 py-1 text-[11px]"
                                 >
                                   <div className="min-w-0 flex-1">

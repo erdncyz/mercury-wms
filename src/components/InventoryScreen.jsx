@@ -279,8 +279,8 @@ export default function InventoryScreen({ t }) {
       const delta = isStockOut ? qty : -qty;
 
       const key = dealerId || `name:${normalizeDealerName(dealerName)}`;
-      const current = dealersSalesMap.get(key) || { name: "", qty: 0 };
-      
+      const current = dealersSalesMap.get(key) || { name: "", products: new Map() };
+
       // Dealer adını bul
       let displayName = current.name;
       if (!displayName) {
@@ -292,12 +292,23 @@ export default function InventoryScreen({ t }) {
         }
       }
 
-      const nextQty = current.qty + delta;
-      dealersSalesMap.set(key, { name: displayName, qty: nextQty });
+      // Urun bazinda net miktari tut (DealerManagementScreen ile tutarli olmasi icin).
+      const productKey = String(log.productId || "") || String(log.productName || "-").trim() || "-";
+      const prevProductQty = current.products.get(productKey) || 0;
+      current.products.set(productKey, prevProductQty + delta);
+
+      dealersSalesMap.set(key, { name: displayName, products: current.products });
     });
 
     const topDealers = Array.from(dealersSalesMap.entries())
-      .map(([, data]) => ({ name: data.name, qty: Math.max(0, data.qty) }))
+      .map(([, data]) => {
+        // Her urunu ayri ayri clamp edip topla; negatif urun satisi 0 sayilir.
+        let qty = 0;
+        data.products.forEach((productQty) => {
+          if (productQty > 0) qty += productQty;
+        });
+        return { name: data.name, qty };
+      })
       .filter((item) => item.qty > 0)
       .sort((a, b) => b.qty - a.qty);
 
