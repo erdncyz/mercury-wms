@@ -160,6 +160,7 @@ export default function ScannerScreen({ t }) {
   const [product, setProduct] = useState(null);
   const [amount, setAmount] = useState(1);
   const [stockWarehouse, setStockWarehouse] = useState("");
+  const [pendingMatches, setPendingMatches] = useState([]);
   const [destination, setDestination] = useState("");
   const [dealers, setDealers] = useState([]);
   const [selectedDealerId, setSelectedDealerId] = useState("");
@@ -190,29 +191,35 @@ export default function ScannerScreen({ t }) {
     const matches = await findProductsByBarcode(barcode);
 
     if (matches.length === 0) {
-      return { product: null, status: "notFound", warehouses: [] };
+      return { product: null, status: "notFound", warehouses: [], matches: [] };
     }
 
     const wh = String(stockWarehouse || "").trim();
-    if (!wh) {
-      return { product: matches[0], status: "found", warehouses: [] };
+
+    if (wh) {
+      const inWarehouse = matches.find(
+        (item) => String(item.details?.warehouseLocation || "").trim() === wh
+      );
+      if (inWarehouse) {
+        return { product: inWarehouse, status: "found", warehouses: [], matches };
+      }
+
+      const warehouses = [
+        ...new Set(
+          matches
+            .map((item) => String(item.details?.warehouseLocation || "").trim())
+            .filter(Boolean)
+        )
+      ];
+      return { product: null, status: "wrongWarehouse", warehouses, matches };
     }
 
-    const inWarehouse = matches.find(
-      (item) => String(item.details?.warehouseLocation || "").trim() === wh
-    );
-    if (inWarehouse) {
-      return { product: inWarehouse, status: "found", warehouses: [] };
+    // Depo secilmemis: tek eslesme varsa direkt kullan, birden fazla depoda varsa kullaniciya sectir.
+    if (matches.length === 1) {
+      return { product: matches[0], status: "found", warehouses: [], matches };
     }
 
-    const warehouses = [
-      ...new Set(
-        matches
-          .map((item) => String(item.details?.warehouseLocation || "").trim())
-          .filter(Boolean)
-      )
-    ];
-    return { product: null, status: "wrongWarehouse", warehouses };
+    return { product: null, status: "chooseWarehouse", warehouses: [], matches };
   }, [stockWarehouse]);
 
   const buildWrongWarehouseMessage = useCallback((warehouses) => {
@@ -320,11 +327,14 @@ export default function ScannerScreen({ t }) {
           playBeep();
 
           try {
-            const { product: found, status, warehouses } = await resolveScannedProduct(normalized);
+            const { product: found, status, warehouses, matches } = await resolveScannedProduct(normalized);
 
             setProduct(found);
+            setPendingMatches(status === "chooseWarehouse" ? matches : []);
 
             if (status === "found") {
+              setManualMode(false);
+            } else if (status === "chooseWarehouse") {
               setManualMode(false);
             } else if (status === "wrongWarehouse") {
               setManualMode(false);
@@ -392,6 +402,7 @@ export default function ScannerScreen({ t }) {
     setManualMode(false);
     setManualBarcode("");
     setProduct(null);
+    setPendingMatches([]);
     setAmount(1);
     setDestination("");
     setSelectedDealerId("");
@@ -402,11 +413,21 @@ export default function ScannerScreen({ t }) {
     await startScan();
   };
 
+  const onPickWarehouse = (picked) => {
+    if (!picked) return;
+    setProduct(picked);
+    setPendingMatches([]);
+    setManualMode(false);
+    setError("");
+    setMessage("");
+  };
+
   const onSwitchScanMode = async () => {
     await stopScan();
     setScannedCode("");
     setManualMode(false);
     setProduct(null);
+    setPendingMatches([]);
     setError("");
     setMessage("");
     setNewProduct(emptyProduct());
@@ -417,6 +438,7 @@ export default function ScannerScreen({ t }) {
     await stopScan();
     setScannedCode("");
     setProduct(null);
+    setPendingMatches([]);
     setError("");
     setMessage("");
     setManualMode(true);
@@ -432,6 +454,7 @@ export default function ScannerScreen({ t }) {
     setSelectedCameraId(nextCameraId);
     setScannedCode("");
     setProduct(null);
+    setPendingMatches([]);
     setError("");
     setMessage("");
     setManualMode(false);
@@ -460,10 +483,13 @@ export default function ScannerScreen({ t }) {
     setScannedCode(normalized);
 
     try {
-      const { product: found, status, warehouses } = await resolveScannedProduct(normalized);
+      const { product: found, status, warehouses, matches } = await resolveScannedProduct(normalized);
       setProduct(found);
+      setPendingMatches(status === "chooseWarehouse" ? matches : []);
 
       if (status === "found") {
+        setManualMode(false);
+      } else if (status === "chooseWarehouse") {
         setManualMode(false);
       } else if (status === "wrongWarehouse") {
         setManualMode(false);
@@ -720,6 +746,33 @@ export default function ScannerScreen({ t }) {
         </button>
       ) : null}
 
+      {scannedCode && !product && pendingMatches.length > 0 && !manualMode ? (
+        <div className="glass rounded-3xl p-4">
+          <p className="text-sm font-semibold text-amber-200">{t.scannerChooseWarehouseTitle}</p>
+          <h3 className="mt-1 text-xl font-bold">{pendingMatches[0]?.name}</h3>
+          <p className="mt-1 text-sm text-slate-400">{t.barcode}: {pendingMatches[0]?.barcode}</p>
+          <p className="mt-3 text-sm text-slate-300">{t.scannerChooseWarehouseHint}</p>
+
+          <div className="mt-3 space-y-2">
+            {pendingMatches.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onPickWarehouse(item)}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-left"
+              >
+                <span className="font-bold text-cyan-200">
+                  {String(item.details?.warehouseLocation || "").trim() || "-"}
+                </span>
+                <span className="text-sm text-slate-300">
+                  {t.scannerChooseWarehouseStock.replace("{count}", String(Number(item.details?.totalProductCount || 0)))}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {scannedCode && product && !manualMode ? (
         <div className="glass rounded-3xl p-4">
           <p className="text-sm text-cyan-300">{t.productFound}</p>
@@ -859,7 +912,7 @@ export default function ScannerScreen({ t }) {
         </div>
       ) : null}
 
-      {(manualMode || (scannedCode && !product)) ? (
+      {(manualMode || (scannedCode && !product && pendingMatches.length === 0)) ? (
         <form onSubmit={onCreateProduct} onPasteCapture={onPasteRefImage} className="glass space-y-3 rounded-3xl p-4">
           <p className="text-sm text-amber-300">{scannedCode ? t.productNotFound : t.manualAddHint}</p>
           <p className="text-xs text-cyan-200">{t.requiredManualFields}</p>

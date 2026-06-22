@@ -248,10 +248,13 @@ export const labels = {
     transferInsufficient: "Yetersiz stok",
     transferSuccess: "{amount} adet {warehouse} deposuna transfer edildi",
     scannerStockWarehouse: "Islem Deposu",
-    scannerStockWarehouseAll: "Otomatik (ilk eslesme)",
+    scannerStockWarehouseAll: "Otomatik (birden fazla depoda varsa sor)",
     scannerStockWarehouseHint: "Stok dusmeden once cikis yapacagin depoyu sec. Ayni barkod birden fazla depoda varsa secili depodaki urune islem yapilir.",
     scannerProductWarehouse: "Depo",
-    scannerWrongWarehouse: "Bu barkod secili depoda ({warehouse}) bulunmuyor. Mevcut depo(lar): {list}"
+    scannerWrongWarehouse: "Bu barkod secili depoda ({warehouse}) bulunmuyor. Mevcut depo(lar): {list}",
+    scannerChooseWarehouseTitle: "Bu urun birden fazla depoda var",
+    scannerChooseWarehouseHint: "Stok dusulecek depoyu sec:",
+    scannerChooseWarehouseStock: "Stok: {count}"
   },
   en: {
     appName: "Mercury WMS",
@@ -502,9 +505,12 @@ export const labels = {
     transferInsufficient: "Insufficient stock",
     transferSuccess: "{amount} units transferred to {warehouse}",
     scannerStockWarehouse: "Operation Warehouse",
-    scannerStockWarehouseAll: "Automatic (first match)",
+    scannerStockWarehouseAll: "Automatic (ask if in multiple warehouses)",
     scannerStockWarehouseHint: "Select the warehouse to operate on before changing stock. If the same barcode exists in multiple warehouses, the item in the selected warehouse is used.",
     scannerProductWarehouse: "Warehouse",
-    scannerWrongWarehouse: "This barcode is not in the selected warehouse ({warehouse}). Available in: {list}"
+    scannerWrongWarehouse: "This barcode is not in the selected warehouse ({warehouse}). Available in: {list}",
+    scannerChooseWarehouseTitle: "This product exists in multiple warehouses",
+    scannerChooseWarehouseHint: "Select the warehouse to reduce stock from:",
+    scannerChooseWarehouseStock: "Stock: {count}"
   }
 };
