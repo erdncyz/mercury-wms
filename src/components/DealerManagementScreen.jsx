@@ -632,20 +632,21 @@ export default function DealerManagementScreen({ t }) {
 
       {pendingDelete ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4">
-          <div className="glass w-full max-w-md rounded-3xl border border-white/10 p-4">
+          <div className="glass relative w-full max-w-md rounded-3xl border border-white/10 p-4">
+            <button
+              type="button"
+              onClick={() => setPendingDelete(null)}
+              disabled={busy}
+              className="absolute right-4 top-4 inline-flex h-6 w-6 items-center justify-center rounded-lg border border-white/20 text-sm font-bold text-slate-300 hover:border-white/40 hover:text-white disabled:opacity-50"
+            >
+              ✕
+            </button>
+
             <h3 className="font-display text-lg font-bold text-slate-100">{t.dealerDeleteTitle}</h3>
             <p className="mt-2 text-sm text-slate-300">
               {t.dealerDeleteConfirm.replace("{name}", String(pendingDelete.name || "-"))}
             </p>
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setPendingDelete(null)}
-                disabled={busy}
-                className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 disabled:opacity-50"
-              >
-                {t.cancel}
-              </button>
+            <div className="mt-4 flex items-center justify-end">
               <button
                 type="button"
                 onClick={onDelete}
@@ -661,7 +662,16 @@ export default function DealerManagementScreen({ t }) {
 
       {pendingReturn ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4">
-          <div className="glass w-full max-w-md rounded-3xl border border-white/10 p-4">
+          <div className="glass relative w-full max-w-md rounded-3xl border border-white/10 p-4">
+            <button
+              type="button"
+              onClick={() => setPendingReturn(null)}
+              disabled={busy}
+              className="absolute right-4 top-4 inline-flex h-6 w-6 items-center justify-center rounded-lg border border-white/20 text-sm font-bold text-slate-300 hover:border-white/40 hover:text-white disabled:opacity-50"
+            >
+              ✕
+            </button>
+            
             <h3 className="font-display text-lg font-bold text-amber-200">Satıştan Azalt / İade</h3>
             <div className="mt-3 space-y-2">
               <p className="text-sm text-slate-300">
@@ -715,14 +725,6 @@ export default function DealerManagementScreen({ t }) {
                 title="Bayiden çek, satıştan tamamen sil"
               >
                 🗑️ Tamamen Çıkar
-              </button>
-              <button
-                type="button"
-                onClick={() => setPendingReturn(null)}
-                disabled={busy}
-                className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold disabled:opacity-50"
-              >
-                {t.cancel}
               </button>
               <button
                 type="button"
