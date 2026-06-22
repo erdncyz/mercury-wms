@@ -284,9 +284,73 @@ textarea::placeholder {
 }
 
 .topbar-shell {
+  position: relative;
   background: linear-gradient(180deg, rgba(7, 16, 31, 0.9), rgba(8, 18, 33, 0.78));
   box-shadow: 0 8px 30px rgba(1, 6, 16, 0.45);
 }
+
+.topbar-shell::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(103, 227, 255, 0.5), rgba(124, 92, 255, 0.4), transparent);
+  pointer-events: none;
+}
+
+/* Brand mark + title */
+.brand-mark {
+  position: relative;
+  height: 46px;
+  width: 46px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgba(103, 227, 255, 0.4);
+  background: linear-gradient(150deg, rgba(40, 110, 150, 0.55), rgba(40, 30, 86, 0.6));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 10px 24px rgba(8, 40, 64, 0.45);
+  overflow: hidden;
+}
+
+.brand-mark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 120% at 0% 0%, rgba(103, 227, 255, 0.45), transparent 55%);
+  pointer-events: none;
+}
+
+.brand-mark-letter {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  background: linear-gradient(160deg, #ffffff, #9fe9ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brand-title {
+  background: linear-gradient(120deg, #ffffff 35%, #8fe6ff 75%, #b69bff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brand-dot {
+  display: inline-block;
+  height: 7px;
+  width: 7px;
+  border-radius: 999px;
+  background: #4ecff3;
+  box-shadow: 0 0 10px rgba(78, 207, 243, 0.8);
+}
+
 
 .main-shell {
   position: relative;
@@ -355,6 +419,11 @@ textarea::placeholder {
   transform: translateY(-1px) scale(1.02);
   border-color: rgba(245, 158, 11, 0.7);
   box-shadow: 0 14px 30px rgba(245, 158, 11, 0.18);
+}
+
+.creator-link-icon {
+  color: #fcd34d;
+  filter: drop-shadow(0 0 6px rgba(252, 211, 77, 0.6));
 }
 
 .creator-link:focus-visible {

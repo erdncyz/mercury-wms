@@ -7,6 +7,7 @@ import {
   HiOutlineClipboardDocumentList,
   HiOutlineLanguage,
   HiOutlineQrCode,
+  HiOutlineSparkles,
   HiOutlineSquares2X2,
   HiOutlineUserCircle
 } from "react-icons/hi2";
@@ -69,9 +70,17 @@ export default function App() {
       <header className="topbar-shell sticky top-0 z-40 border-b border-white/10 backdrop-blur">
         <div className="mx-auto w-full max-w-4xl px-4 py-3">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="font-display text-[1.85rem] font-bold leading-[1.05] sm:text-xl">{t.appName}</h1>
-              <p className="mt-1 text-sm text-slate-400 sm:text-xs">{t.appSubtitle}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="brand-mark hidden shrink-0 sm:flex">
+                <span className="brand-mark-letter">M</span>
+              </div>
+              <div className="min-w-0">
+                <h1 className="brand-title font-display text-[1.85rem] font-bold leading-[1.05] sm:text-xl">{t.appName}</h1>
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-400 sm:text-xs">
+                  <span className="brand-dot" />
+                  {t.appSubtitle}
+                </p>
+              </div>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -120,6 +129,7 @@ export default function App() {
             rel="noreferrer"
             className="creator-link mt-3 inline-flex w-full justify-center sm:mt-2 sm:w-auto"
           >
+            <HiOutlineSparkles size={15} className="creator-link-icon" />
             Geliştiren Erdinç Yılmaz
           </a>
         </div>
