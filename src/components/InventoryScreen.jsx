@@ -288,8 +288,7 @@ export default function InventoryScreen({ t }) {
 
     const topDealers = Array.from(dealersSalesMap.entries())
       .map(([, data]) => ({ name: data.name, qty: data.qty }))
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5);
+      .sort((a, b) => b.qty - a.qty);
 
     return {
       totalProducts: products.length,
