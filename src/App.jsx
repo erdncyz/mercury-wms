@@ -66,8 +66,8 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell min-h-screen text-slate-100">
-      <header className="topbar-shell sticky top-0 z-40 border-b border-white/10 backdrop-blur">
+    <div className="app-shell flex h-[100dvh] flex-col text-slate-100">
+      <header className="topbar-shell z-40 shrink-0 border-b border-white/10 backdrop-blur">
         <div className="mx-auto w-full max-w-4xl px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -144,16 +144,18 @@ export default function App() {
         </div>
       </header>
 
-      <main className="main-shell mx-auto w-full max-w-4xl px-4 py-4 pb-32 sm:pb-28">
-        <Suspense fallback={<div className="glass rounded-2xl p-4 text-slate-300">{t.loading}</div>}>
-          {activeTab === "scan" ? <ScannerScreen t={t} /> : null}
-          {activeTab === "list" ? <InventoryScreen t={t} /> : null}
-          {activeTab === "logs" ? <ActivityLogScreen t={t} /> : null}
-          {activeTab === "dealers" ? <DealerManagementScreen t={t} /> : null}
-        </Suspense>
+      <main className="main-shell flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-4xl px-4 py-4 pb-8">
+          <Suspense fallback={<div className="glass rounded-2xl p-4 text-slate-300">{t.loading}</div>}>
+            {activeTab === "scan" ? <ScannerScreen t={t} /> : null}
+            {activeTab === "list" ? <InventoryScreen t={t} /> : null}
+            {activeTab === "logs" ? <ActivityLogScreen t={t} /> : null}
+            {activeTab === "dealers" ? <DealerManagementScreen t={t} /> : null}
+          </Suspense>
+        </div>
       </main>
 
-      <nav className="bottom-nav-shell fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:p-3">
+      <nav className="bottom-nav-shell z-40 shrink-0 border-t border-white/10 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:p-3">
         <div className="mx-auto grid w-full max-w-4xl grid-cols-4 gap-1.5 sm:gap-2">
           <button
             type="button"
