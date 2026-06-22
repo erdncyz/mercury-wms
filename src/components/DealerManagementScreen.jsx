@@ -60,23 +60,24 @@ export default function DealerManagementScreen({ t }) {
     return () => unsub();
   }, []);
 
-  // Bayi bazinda satilan urunleri (stok dusus islemleri) topla.
-  // OUT islemleri (satislar) topla, sonra IN islemleri (iadeler) cikar.
+  // Bayi bazinda net satilan urunleri hesapla (OUT ekle, IN iade dus).
   const salesByDealer = useMemo(() => {
     const map = new Map();
+    const normalizeDealerName = (value) => String(value || "").trim().toLocaleLowerCase("tr");
 
-    // Adim 1: OUT islemleri (satislar) ekle
     salesLogs.forEach((log) => {
       const isStockOut = String(log.stockType || "").toUpperCase() === "OUT" || log.action === "stock_out";
-      if (!isStockOut) return;
+      const isStockIn = String(log.stockType || "").toUpperCase() === "IN" || log.action === "stock_in";
+      if (!isStockOut && !isStockIn) return;
 
       const dealerId = String(log.dealerId || "").trim();
       const dealerName = String(log.dealerName || "").trim();
       if (!dealerId && !dealerName) return;
 
-      const key = dealerId || `name:${String(dealerName || "").toLocaleLowerCase("tr")}`;
+      const key = dealerId || `name:${normalizeDealerName(dealerName)}`;
       const qty = Math.abs(Number(log.amount || 0));
       if (!Number.isFinite(qty) || qty <= 0) return;
+      const delta = isStockOut ? qty : -qty;
 
       const productName = String(log.productName || "-").trim() || "-";
       const productId = String(log.productId || "");
@@ -87,49 +88,28 @@ export default function DealerManagementScreen({ t }) {
         entry = { totalQty: 0, products: new Map() };
         map.set(key, entry);
       }
-      entry.totalQty += qty;
+      entry.totalQty += delta;
 
       const existing = entry.products.get(productKey);
       if (existing) {
-        existing.qty += qty;
+        existing.qty += delta;
         if (!existing.productId && productId) {
           existing.productId = productId;
         }
       } else {
-        entry.products.set(productKey, { name: productName, productId, qty });
+        entry.products.set(productKey, { name: productName, productId, qty: delta });
       }
     });
 
-    // Adim 2: IN islemleri (iadeler) cikar
-    salesLogs.forEach((log) => {
-      const isStockIn = String(log.stockType || "").toUpperCase() === "IN" || log.action === "stock_in";
-      if (!isStockIn) return;
-
-      const dealerId = String(log.dealerId || "").trim();
-      const dealerName = String(log.dealerName || "").trim();
-      if (!dealerId && !dealerName) return;
-
-      const key = dealerId || `name:${String(dealerName || "").toLocaleLowerCase("tr")}`;
-      const qty = Math.abs(Number(log.amount || 0));
-      if (!Number.isFinite(qty) || qty <= 0) return;
-
-      const productName = String(log.productName || "-").trim() || "-";
-      const productId = String(log.productId || "");
-      const productKey = productId || productName;
-
-      let entry = map.get(key);
-      if (!entry) return; // Bu bayiye gelen IN varsa ama OUT yoksa, atliyoruz
-
-      entry.totalQty -= qty;
-      if (entry.totalQty < 0) entry.totalQty = 0;
-
-      const existing = entry.products.get(productKey);
-      if (existing) {
-        existing.qty -= qty;
-        if (existing.qty <= 0) {
+    map.forEach((entry) => {
+      entry.totalQty = Math.max(0, entry.totalQty);
+      entry.products.forEach((product, productKey) => {
+        if (product.qty <= 0) {
           entry.products.delete(productKey);
+          return;
         }
-      }
+        product.qty = Math.max(0, product.qty);
+      });
     });
 
     return map;
@@ -159,8 +139,10 @@ export default function DealerManagementScreen({ t }) {
       });
     });
 
-    const productList = Array.from(products.values()).sort((a, b) => b.qty - a.qty);
-    return { totalQty, products: productList };
+    const productList = Array.from(products.values())
+      .filter((item) => item.qty > 0)
+      .sort((a, b) => b.qty - a.qty);
+    return { totalQty: Math.max(0, totalQty), products: productList };
   };
 
   const toggleSales = (dealerId) => {

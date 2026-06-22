@@ -252,24 +252,33 @@ export default function InventoryScreen({ t }) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
-    // Bayiler satış verilerini hesapla
+    // Bayiler net satis verilerini hesapla (OUT ekle, IN iade dus)
     const dealersSalesMap = new Map();
-    let totalSales = 0;
+
+    const normalizeDealerName = (value) => String(value || "").trim().toLocaleLowerCase("tr");
+    const activeDealerIds = new Set(dealers.map((d) => String(d.id || "").trim()).filter(Boolean));
+    const activeDealerNames = new Set(dealers.map((d) => normalizeDealerName(d.name)).filter(Boolean));
 
     salesLogs.forEach((log) => {
       const isStockOut = String(log.stockType || "").toUpperCase() === "OUT" || log.action === "stock_out";
-      if (!isStockOut) return;
+      const isStockIn = String(log.stockType || "").toUpperCase() === "IN" || log.action === "stock_in";
+      if (!isStockOut && !isStockIn) return;
 
       const dealerId = String(log.dealerId || "").trim();
       const dealerName = String(log.dealerName || "").trim();
       if (!dealerId && !dealerName) return;
 
+      const hasActiveDealer = dealerId
+        ? activeDealerIds.has(dealerId)
+        : activeDealerNames.has(normalizeDealerName(dealerName));
+      if (!hasActiveDealer) return;
+
       const qty = Math.abs(Number(log.amount || 0));
       if (!Number.isFinite(qty) || qty <= 0) return;
 
-      totalSales += qty;
+      const delta = isStockOut ? qty : -qty;
 
-      const key = dealerId || dealerName;
+      const key = dealerId || `name:${normalizeDealerName(dealerName)}`;
       const current = dealersSalesMap.get(key) || { name: "", qty: 0 };
       
       // Dealer adını bul
@@ -282,13 +291,17 @@ export default function InventoryScreen({ t }) {
           displayName = dealerName;
         }
       }
-      
-      dealersSalesMap.set(key, { name: displayName, qty: current.qty + qty });
+
+      const nextQty = current.qty + delta;
+      dealersSalesMap.set(key, { name: displayName, qty: nextQty });
     });
 
     const topDealers = Array.from(dealersSalesMap.entries())
-      .map(([, data]) => ({ name: data.name, qty: data.qty }))
+      .map(([, data]) => ({ name: data.name, qty: Math.max(0, data.qty) }))
+      .filter((item) => item.qty > 0)
       .sort((a, b) => b.qty - a.qty);
+
+    const totalSales = topDealers.reduce((sum, item) => sum + item.qty, 0);
 
     return {
       totalProducts: products.length,
@@ -297,11 +310,11 @@ export default function InventoryScreen({ t }) {
       lowStock,
       warehouseDistribution,
       topProducts,
-      totalDealersSales: dealersSalesMap.size,
+      totalDealersSales: topDealers.length,
       totalSalesQty: totalSales,
       topDealers
     };
-  }, [products, salesLogs]);
+  }, [products, salesLogs, dealers]);
 
   const sorted = useMemo(() => {
     const getStock = (p) => {
