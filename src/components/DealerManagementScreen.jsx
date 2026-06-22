@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { applyStockChange, createDealer, deleteDealer, subscribeActivityLogs, subscribeDealers, updateDealer } from "../services/stockService";
+import { applyStockChange, createDealer, deleteDealer, subscribeActivityLogs, subscribeDealers, subscribeProducts, updateDealer } from "../services/stockService";
 
 function emptyDealerForm() {
   return {
@@ -24,6 +24,7 @@ function mapSaveError(error, t) {
 
 export default function DealerManagementScreen({ t }) {
   const [dealers, setDealers] = useState([]);
+  const [products, setProducts] = useState([]);
   const [salesLogs, setSalesLogs] = useState([]);
   const [expandedSalesIds, setExpandedSalesIds] = useState([]);
   const [search, setSearch] = useState("");
@@ -41,6 +42,13 @@ export default function DealerManagementScreen({ t }) {
   useEffect(() => {
     const unsub = subscribeDealers((rows) => {
       setDealers(rows);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeProducts((rows) => {
+      setProducts(rows);
     });
     return () => unsub();
   }, []);
@@ -290,12 +298,16 @@ export default function DealerManagementScreen({ t }) {
     setMessage("");
 
     try {
+      // Ürünün depo bilgisini al
+      const product = products.find((p) => p.id === pendingReturn.productId);
+      const warehouseLocation = String(product?.details?.warehouseLocation || "").trim();
+
       await applyStockChange({
         productId: pendingReturn.productId,
         productName: pendingReturn.name,
         amount,
         type: "IN",
-        destination: "",
+        destination: warehouseLocation,
         dealerId: String(pendingReturn.dealerId || ""),
         dealerName: String(pendingReturn.dealerName || "")
       });
@@ -614,6 +626,14 @@ export default function DealerManagementScreen({ t }) {
               </p>
               <p className="text-sm text-slate-300">
                 Satılan Miktarı: <span className="font-bold text-cyan-200">{pendingReturn.qty}</span>
+              </p>
+              <p className="text-sm text-slate-300">
+                Depo: <span className="font-bold text-purple-300">
+                  {(() => {
+                    const prod = products.find((p) => p.id === pendingReturn.productId);
+                    return String(prod?.details?.warehouseLocation || "-").trim() || "-";
+                  })()}
+                </span>
               </p>
             </div>
 
